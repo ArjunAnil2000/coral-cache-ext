@@ -1,0 +1,23 @@
+# LiteLLM gateway config for CORAL's single agent. Mirrors the Bedrock setup
+# mem-evolve's old coordinator already uses (see mem-evolve/litellm-creds.sh
+# and [llm.mutator]/[llm.planner] in cache_policy_evolution/*.toml) so the
+# agent's model calls route through Bedrock credentials, not a direct
+# Anthropic/Claude API key.
+#
+# TODO (fill in once the CloudLab node is reachable again): mem-evolve's
+# local litellm-creds.sh only carries AWS_ACCESS_KEY_ID in this checkout —
+# AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION and the exact Bedrock model id
+# (e.g. "bedrock/anthropic.claude-sonnet-4-5-...") live only on the node.
+# Confirm the exact model id string there (check what the old coordinator's
+# running litellm proxy config / aws bedrock list-foundation-models shows)
+# before first `coral start`.
+model_list:
+  - model_name: "claude-sonnet"
+    litellm_params:
+      model: "bedrock/anthropic.claude-sonnet-TODO"
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      aws_region_name: os.environ/AWS_DEFAULT_REGION
+
+litellm_settings:
+  drop_params: true

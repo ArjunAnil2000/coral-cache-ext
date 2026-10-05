@@ -1,0 +1,32 @@
+# CORAL task: dry plumbing run for cache_ext page-cache policy evolution.
+#
+# Goal of this task definition is NOT a real experiment — it's a minimal
+# end-to-end proof that one CORAL agent can edit the seed policy, have the
+# grader compile it against the real cache_ext toolchain, attach it via BPF
+# struct_ops, run it under the cgroup-isolated benchmark, and return a score.
+# See coral-cache-evolution's sibling repo mem-evolve/coral-learnings.md for
+# the full migration research this is based on.
+
+grader:
+  entrypoint: "cache_evolution_grader.grader:Grader"
+  setup:
+    - "uv pip install -e ./grader"
+  timeout: 120
+  direction: maximize
+
+agents:
+  count: 1
+  runtime: claude_code
+  model: "claude-sonnet"   # matches the Bedrock alias already used by mem-evolve's [llm.mutator]
+  gateway:
+    enabled: true
+    port: 4001              # distinct from mem-evolve's old coordinator proxy (idle on :4000)
+    config: "./litellm_config.yaml"
+
+workspace:
+  repo_path: "./seed"
+  results_dir: "./results"
+
+run:
+  session: local
+  docker_image: ""
