@@ -1,4 +1,2 @@
-__pycache__/
-*.pyc
-.coral/
-results/
+cloudlab-instances.md
+litellm-creds.sh
