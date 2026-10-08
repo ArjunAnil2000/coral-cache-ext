@@ -75,7 +75,8 @@ export PATH="$HOME/.local/bin:$PATH"
 coral start -c task.yaml run.stop.max_real_attempts=5     # bounded; drop the override for an open-ended run
 ```
 This starts CORAL's gateway on `:4001`, creates a git worktree of `seed/` and launches
-one Claude Code agent in tmux. The agent edits `noop.c` and submits with `coral eval`;
+one Claude Code agent as a child process of the manager (`run.session: local`; CORAL's
+default would wrap it in tmux, ours does not). The agent edits `noop.c` and submits with `coral eval`;
 the grader ships it to the node and returns a score plus per-probe feedback. Without
 `max_real_attempts` it runs until you stop it.
 
@@ -86,7 +87,7 @@ coral status          # manager/agent health, attempt counts, best score
 coral log             # leaderboard
 coral ui              # web dashboard
 curl -s localhost:4001/health
-tmux ls               # the agent's session
+pgrep -af 'claude -p'  # the agent process (its cwd is agents/<name>/ in the run dir)
 coral stop            # stop a run
 ```
 Run output is under `results/cache-ext-get-scan/<run>/` (gitignored): `.coral/public/attempts/*.json`
