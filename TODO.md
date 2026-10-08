@@ -1,53 +1,70 @@
 # TODO
 
-Status as of 2026-10-07: SSH-backend grader implemented and committed; local tests
-pass (19). **Verified:** `coral validate` passes end to end against node `c220g1-030815`
-(real TaskGrader API, remote compile/attach/get_scan, 8-run noop calibration, seed score
-0.0104 ~ 0 as expected); forced-command key is restricted; Bedrock model id answers via
-litellm. Noop baseline: throughput 1219.7 +- 30.8 ops/s (n=8, ~2.5% std), iostat
-3.19e8 +- 7.7e6, ~40s per eval. **Not yet verified:** a full `coral start` agent run,
-the model call through CORAL's :4001 gateway, whether Claude Code honors the injected
-ANTHROPIC_API_KEY over a stored login.
+## Status (2026-10-08)
+
+The repo is self-contained (`node/` + `third_party/cache_ext` submodule) and the SSH
+eval backend is deployed to the CloudLab node `c220g1-030815` at
+`/mydata/coral-cache-evolution`.
+
+**Verified**
+- Local tests pass (19), including `node/eval_remote.py` run as a real subprocess
+  against a stub evaluator.
+- On the node, from the self-contained tree: forced-command key is restricted (no
+  shell, path escapes rejected), benchmark stack builds from the repo
+  (`node/bench/get_scan/setup.sh`), and a real `noop` compile + eval returns valid
+  probes.
+- Bedrock model `bedrock/us.anthropic.claude-opus-5-5` answers via litellm.
+- A full 5-attempt `coral start` run (before the self-contained move, same
+  grader logic): 0 grader errors, scores 0.72 / 0.65 / 0.48 / 0.43 / -0.31, agent
+  traffic went through the :4001 gateway to Bedrock.
+- Re-measuring the best policy (8 runs) against a `noop` control (8 runs): policy
+  score 0.79 ± 0.24, throughput 1271 ± 22 ops/s; noop 0.005 ± 0.23, 1224 ± 14 ops/s
+  (about +4% throughput). Single-eval leaderboard scores are optimistic.
+
+**After the move:** `coral validate` passes on the self-contained tree
+(`/mydata/coral-cache-evolution`, new benchmark DB at `/mydata/coral_get_scan_db`).
+New noop calibration (n=8): throughput 1211.6 ± 24 ops/s, iostat 3.20e8 ± 6.1e6,
+refaults 51369 ± 1465. The unchanged `noop` seed scored **-0.50** on that validate
+run (throughput z=-0.88, the other probes at ~0). That is within the single-eval
+noise seen before (noop controls ranged about -0.3..+0.4) but at the edge of it, so
+re-check with repeated noop evals before trusting any score near 0. A fresh
+`coral start` on the new tree has not been run yet.
 
 ## Next steps
 
-1. ~~Validate the Bedrock model id~~ DONE 2026-10-07: `bedrock/us.anthropic.claude-opus-5-5` answered a litellm call with the creds in `litellm-creds.sh`. Still untested *through CORAL's gateway* (alias `claude-sonnet` actually routes to Opus 5.5; consider renaming the alias).
-2. ~~`coral validate`~~ DONE (stats cached at `~/.cache/cache_evolution_grader/get_scan_noop_stats.json`; delete if the node changes).
-3. Note the noise floor: a single noop re-run scores ~N(0, ~0.3) per component, so small scores are noise; consider repeats before trusting small wins.
-4. `coral start -c task.yaml`; confirm an attempt lands in `.coral/public/attempts/`
-   and model calls go through the :4001 gateway.
+1. Run repeated `noop` evals on the new tree (e.g. 8) to confirm the baseline is stable and
+   the -0.50 seed score was noise, then a bounded `coral start` and compare with the
+   pre-move run.
+2. Exercise `node/setup_node.sh` on a genuinely fresh node (it has only been
+   syntax-checked; the existing node was provisioned before it was written).
+3. Decide how to handle the agent reading material outside its worktree. Agents run
+   as the same OS user as CORAL, so a path restriction can't be enforced without
+   `agents.sandbox` or `agents.isolate_user` (the latter needs CORAL to run as root).
+   The first run's agent found and reused earlier results from elsewhere on the
+   machine; results are not independent unless that is closed off.
+4. Repeat evals of any policy worth reporting (single-eval noise is about ±0.2–0.3).
+5. The first run's gateway log showed a 400 for model `claude-sonnet-5`; an alias was
+   added to `litellm_config.yaml`. Check the next run's gateway log is clean.
 
-## Open questions to resolve before going past the dry run
+## Open questions
 
-- Whether CORAL ever runs multiple grader subprocesses concurrently for
-  the same task (vs. queuing evaluations itself) — determines whether the
-  `node-side flock in `remote/eval_remote.py` is a safety net for a rare race or the
-  only thing standing between two concurrent BPF attach attempts. Not
-  resolved by the research in `mem-evolve/coral-learnings.md`; also not
-  exercisable with `agents.count: 1` as currently configured.
-- Whether/how `.coral/public/` (notes/attempts/skills) can be pre-seeded
-  with `mem-evolve`'s existing findings (e.g. the throughput-exp writeup,
-  the scoring-function fix from 2026-08-13) so a fresh CORAL run starts
-  with prior-run context instead of from scratch.
-- Cost model for running a persistent Claude Code agent session per
-  evolution attempt vs. the old mutator/planner/frontier short
-  chat-completion-call pattern.
+- Whether CORAL ever runs multiple grader subprocesses concurrently for one task.
+  Its default is serial (`grader.parallel.max_workers: 1`); the node-side flock in
+  `node/eval_remote.py` is the safety net if that is raised. Not exercisable with
+  `agents.count: 1`.
+- Whether `.coral/public/` (notes, attempts, skills) can be pre-seeded with prior
+  findings so a fresh run starts with context.
+- Cost of a persistent Claude Code agent session per run (Bedrock billing) compared
+  with short chat-completion calls.
+- Whether Claude Code honours CORAL's injected `ANTHROPIC_API_KEY` in every case
+  (gateway logs showed requests arriving, so it did in the first run).
 
-## Explicitly deferred — not part of this dry run
+## Deferred
 
-- **Real seed set.** Swap `seed/noop.c` for `vulcan_scan_resist.c` /
-  `vulcan_scan_class.c` / the full `get_scan.toml` workload once the
-  plumbing is proven. `get_scan.toml` has the most complete existing
-  write-up and a direct throughput probe — natural first real target per
-  `mem-evolve/coral-learnings.md`'s "suggested first migration step."
-- **`agents.count` above 1** — multi-agent coordination, islands. Raising
-  this is also what would actually exercise the open question above about
-  concurrent grader subprocesses.
-- **Real scoring.** DONE in code (untested on node): grader now applies get_scan.toml
-  probes/weights + noop-baseline z-score/tanh (see grader.py docstring). Still to do:
-  run `python -m cache_evolution_grader.calibrate` on the node and sanity-check the stats.
-- **Old-coordinator retirement decision.** Whether `mem-evolve`'s
-  `evolve.py` / `worker_server.py` / `start_workers.sh` fleet keeps running
-  in parallel as a fallback, or gets archived once this pilot validates
-  against known-good results (e.g. reproducing `exp1--baseline`'s
-  throughput numbers).
+- **Real seed set.** `seed/noop.c` is the dry-run seed. Other starting policies need
+  the `vulcan_bpf` headers (nested submodule, already staged at compile time) and
+  would be added under `seed/`.
+- **`agents.count` > 1**, islands.
+- **Multiple nodes:** one CORAL instance per node. A multi-node grader (a list of
+  `ssh_target`s with per-node calibration stats) is not implemented.
+- **Pinning the CORAL version** instead of installing from `main`.

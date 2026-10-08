@@ -1,92 +1,107 @@
 # coral-cache-evolution
 
-Dry-plumbing CORAL task for the `mem-evolve`/`cache_policy_evolution`
-page-cache policy evolution project (`arjua-forks/mem-evolve/`). This is a
-deliberately separate repo, not a subdirectory of `mem-evolve/` — CORAL
-gives each agent its own git worktree of `workspace.repo_path` (`./seed`),
-and keeping that isolated avoids mixing CORAL's `.coral/` runtime state into
-the existing research repo's history.
+A [CORAL](https://github.com/Human-Agent-Society/CORAL) task for evolving Linux
+page-cache eviction policies, written as eBPF `cache_ext` struct_ops programs,
+against a GET-SCAN LevelDB workload. An autonomous Claude Code agent edits one
+policy file; a grader compiles it on a CloudLab node, runs the benchmark under
+the policy, and scores it.
 
-**This is not a real experiment.** The only goal right now is proving the
-full pipeline works end to end, before any decisions about real seeds,
-multiple agents, or retiring the old coordinator get made. See `TODO.md`
-for the actionable checklist and everything still open.
+The repo is **self-contained**: everything the task uses is in this directory
+(the `cache_ext` project comes in as a git submodule).
 
-Background / full migration research: `mem-evolve/coral-learnings.md`.
+Status and open items: `TODO.md`. Operational runbook: `how-to-run.md`.
 
-## What this proves (once run)
+## Topology
 
-One CORAL agent edits `seed/noop.c` → the grader
-(`grader/src/cache_evolution_grader/grader.py`) compiles it against the real
-`cache_ext` toolchain → attaches it via BPF struct_ops → runs it under the
-cgroup-isolated benchmark → returns a score → the attempt shows up under
-`.coral/public/attempts/`.
-
-## Topology: CORAL runs here, grading runs on the node over SSH
-
-CORAL's manager, agents and grader subprocess share one host and CORAL has
-no remote-worker concept — but the grader is just a subprocess, so it can
-reach out. Here CORAL and its agent(s) run on the **dev host** (no special
-kernel needed; agents only edit `.c` files). To grade, the grader ssh-es to
-the **CloudLab node**, which has the booted `6.6.8-cache-ext` kernel,
-`clang-14`/`bpftool` and the benchmark cgroup:
+CORAL's manager, agents and grader subprocess all run on **one host** (the "dev
+host", no special kernel needed). Agents only edit a `.c` file. To grade, the
+grader ssh-es to a **CloudLab node** that has the booted `6.6.8-cache-ext`
+kernel, `clang-14`, `bpftool` and the benchmark stack:
 
 ```
-dev host:  coral start -> agent edits seed/noop.c -> grader (scoring, calibration stats)
-                                                        |  ssh (forced-command key)
-node:      eval_remote.py: flock -> compile_policy -> attach struct_ops
-                           -> get_scan benchmark -> probe values (JSON)
+dev host:  coral start -> agent edits noop.c -> grader (scoring, calibration stats)
+                                                   |  ssh (forced-command key)
+node:      node/eval_remote.py: flock -> compile_policy -> attach struct_ops
+                                -> get_scan benchmark -> raw probe values (JSON)
 ```
 
-The grader is deterministic code (not an LLM): it keeps CORAL's property that
-agents can't tamper with grading. Scoring (noop-baseline z-score + tanh) is
-done locally from the probe values the node returns.
+The grader is deterministic code, not an LLM, so agents cannot tamper with
+grading. Scoring happens on the dev host from the probe values the node returns.
 
-The ssh key is a dedicated **forced-command** key (`remote/install_remote.sh`):
-it can only run `eval_remote.py`, with no shell/pty/forwarding, so an agent
-that reads `~/.ssh/coral_eval_ed25519` (agents run as the same user) still
-can't get a shell on the node. `eval_remote.py` also refuses benchmark paths
-outside `MEM_EVOLVE_ROOT/eval`. Compiling/attaching an agent-written policy as
-root is inherent to the task.
+**Why SSH instead of running CORAL on the node:** CORAL has no remote-worker
+concept, but its grader is just a subprocess, so it can reach out. This keeps the
+agent runtime, the LLM gateway and the AWS credentials off the node.
 
-## Repo layout
+**Security model.** `node/install_remote.sh` installs a dedicated passphrase-less
+key as a *forced-command* key: it can only run `node/eval_remote.py` (as root via
+`sudo -n`), with no shell, pty or forwarding. Agents run as the same user as
+CORAL and could read the private key, but it gives them no shell on the node.
+`eval_remote.py` also refuses benchmark paths outside `node/bench/`. Compiling and
+attaching an agent-written policy as root is inherent to the task.
+
+**Serialization.** Attaching a struct_ops program is a global, exclusive kernel
+slot and `compile_policy()` mutates `cache_ext/policies/` in place, so
+`eval_remote.py` holds `/run/evo_cache/eval.lock` (bounded wait) across compile and
+all evals of a request. CORAL itself grades serially by default
+(`grader.parallel.max_workers: 1`).
+
+## Layout
 
 ```
-coral-cache-evolution/
-├── task.yaml                # CORAL task config: 1 agent, claude_code runtime,
-│                            # LiteLLM gateway on :4001, grader entrypoint + args
-├── litellm_config.yaml      # Bedrock model routing for the gateway
-├── seed/noop.c              # dry-run placeholder policy (agent's starting point)
-├── remote/
-│   ├── eval_remote.py       # runs ON the node: lock, compile, attach, benchmark -> JSON
-│   └── install_remote.sh    # one-time: key + script + forced-command authorized_keys
-└── grader/
-    ├── pyproject.toml
-    ├── tests/test_scoring.py        # local tests (stubbed coral; real eval_remote.py subprocess vs stub evaluator)
-    └── src/cache_evolution_grader/
-        ├── grader.py        # Grader: calibration + remote call + scoring
-        ├── remote.py        # ssh client (retry on connection failure)
-        ├── scoring.py       # probe specs, weights, stats cache, feedback text
-        ├── normalization.py # verbatim copy of mem-evolve evolution/normalization.py
-        ├── calibrate.py     # pre-calibration CLI
-        └── baseline_noop.c  # noop baseline used for calibration (not the agent's copy)
+.
+├── task.yaml                    CORAL config: task description (the agent's problem
+│                                statement), grader args, 1 claude_code agent, gateway :4001
+├── litellm_config.yaml          Bedrock model routing for CORAL's LiteLLM gateway
+├── seed/
+│   ├── noop.c                   starting policy (no-op = the score baseline); the ONLY graded file
+│   └── reference/               cache_ext headers + reference policies for the agent to read
+├── grader/                      CORAL grader package (runs on the dev host)
+│   ├── src/cache_evolution_grader/
+│   │   ├── grader.py            calibration + remote call + scoring
+│   │   ├── remote.py            ssh client (one retry on connection failure)
+│   │   ├── scoring.py           probe specs, weights, stats cache, feedback text
+│   │   ├── normalization.py     online z-score + tanh squash
+│   │   ├── calibrate.py         pre-calibration CLI
+│   │   └── baseline_noop.c      noop baseline used for calibration (not the agent's copy)
+│   └── tests/test_scoring.py    local tests (stubbed coral; real eval_remote.py vs stub evaluator)
+├── node/                        everything that runs ON the CloudLab node
+│   ├── eval_remote.py           request/response server behind the forced command
+│   ├── install_remote.sh        dev host: key + rsync repo to node + authorized_keys entry
+│   ├── setup_node.sh            on a FRESH node: kernel, toolchain, bench stack
+│   ├── evaluator/               compile_policy / evaluate / probes (stdlib only)
+│   ├── targets/                 combined-file splitter + compile pipeline
+│   ├── policy_lib/evo_dump.h    header staged into policies/ at compile time
+│   └── bench/get_scan/          run_with_policy.sh (the benchmark), setup.sh (its build)
+├── third_party/cache_ext/       submodule (pinned): policy Makefile + headers, nested vulcan_bpf
+└── scripts/sync_reference.sh    regenerates seed/reference/ from the submodule
 ```
 
-## Key design decisions baked into this scaffold
+## Scoring
 
-- **`agents.count: 1`** — multi-agent is an explicit "later" decision.
-- **LiteLLM/Bedrock, not direct Claude auth** — model calls route through
-  CORAL's own gateway (`litellm_config.yaml`) with AWS Bedrock credentials,
-  never a direct Anthropic API key. Gateway on **:4001** to avoid colliding
-  with the old coordinator's proxy on :4000.
-- **Evaluation is remote and serialized on the node.** Struct_ops attach is a
-  global exclusive slot and `compile_policy()` mutates `cache_ext/policies/`,
-  so `eval_remote.py` holds `/run/evo_cache/eval.lock` (bounded wait) across
-  compile + all evals of one request. Concurrent graders queue there.
-- **Scoring mirrors `get_scan.toml` (2026-08-13)**: throughput=2.0,
-  cgroup_iostat=0.5, cgroup_memstat=0.25, z-scored against frozen noop stats,
-  tanh-squashed. Stats are cached locally (`stats_path`) with a fingerprint
-  of (probes, weights, ssh target + benchmark, baseline source).
-- **Scaling out later**: one CORAL instance per node (as in coral-learnings.md);
-  a multi-node grader would be a list of `ssh_target`s with per-node
-  calibration stats — not implemented.
+Per eval the node returns raw probe values; the grader scores them against
+frozen stats of the `noop` baseline (8 calibration runs, cached locally):
+
+- probes: `throughput` (ops/s from the benchmark's `results.json`, maximize,
+  weight **2.0**), `cgroup_iostat` (bytes read, minimize, 0.5), `cgroup_memstat`
+  (refaults, minimize, 0.25); wallclock and policy counters are recorded, not scored
+- score = weighted mean of `tanh(±z)` per probe, in [-1, 1]; 0 = same as noop
+- throughput is scored directly because bytes read alone would reward a policy whose
+  throughput regressed
+- stats are frozen after calibration and fingerprinted on (probes, weights, ssh
+  target + benchmark, baseline source); a mismatch recalibrates automatically
+
+Measurement noise is real: the noop baseline's throughput std is ~2.5%, and a
+single eval of an unchanged policy moves the score by roughly ±0.2–0.3. Repeat
+evals before trusting small differences.
+
+## Design decisions
+
+- **`agents.count: 1`** for now; multi-agent is a later decision.
+- **LiteLLM/Bedrock, not direct Claude auth.** CORAL's gateway (`:4001`) routes the
+  agent's calls to AWS Bedrock; CORAL injects `ANTHROPIC_BASE_URL`/key into the
+  agent's environment. Usage is billed to the AWS account, not a Claude subscription.
+- **One node per CORAL instance.** Struct_ops attach can't be parallelised within a
+  kernel; for more throughput run one CORAL instance per node.
+- **Paths on the node** derive from where the repo is deployed
+  (`/mydata/coral-cache-evolution` by default). The benchmark DB defaults to
+  `/mydata/coral_get_scan_db` (override with `DB_DIR`).

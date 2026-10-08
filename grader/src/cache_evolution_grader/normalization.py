@@ -1,7 +1,4 @@
-# VENDORED from mem-evolve/cache_policy_evolution/evolution/normalization.py
-# (math unchanged). Copied so the grader need not import the `evolution`
-# package, whose __init__ pulls in LLM/tree dependencies. Re-sync if upstream
-# scoring math changes.
+# Online z-score normalization used by the grader (self-contained; stdlib only).
 """Online z-score normalization for probe values.
 
 Why this exists

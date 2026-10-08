@@ -6,8 +6,7 @@ grader ssh-es to a CloudLab node (remote.py -> remote/eval_remote.py), which
 compiles the policy, attaches it via BPF struct_ops, runs the cgroup-isolated
 get_scan benchmark, and returns the raw probe values. Scoring happens HERE.
 
-Scores the way mem-evolve's coordinator did for get_scan.toml (as changed on
-2026-08-13): probes = evaluator DEFAULT_PROBES + a `throughput` json_extract
+Scoring for the get_scan workload: probes = evaluator DEFAULT_PROBES + a `throughput` json_extract
 probe (results.json -> throughput_ops_per_sec, maximize); weights
 throughput=2.0, cgroup_iostat=0.5, cgroup_memstat=0.25; each probe is
 z-scored against frozen stats from the `noop` baseline, tanh-squashed, and
@@ -52,11 +51,11 @@ DEFAULTS = {
     "ssh_options": [],               # extra ssh args, e.g. ["-p", "2222"]
     "ssh_connect_timeout": 15,
     "remote_command": "sudo -n env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin "
-                      "python3.11 /mydata/evo_cache/coral-remote/eval_remote.py",
+                      "python3.11 /mydata/coral-cache-evolution/node/eval_remote.py",
     # --- benchmark / scoring ---
-    "benchmark": "eval/get_scan/run_with_policy.sh",   # relative to MEM_EVOLVE_ROOT on the node
-    "eval_timeout": 180,             # get_scan.toml `timeout`
-    "calibrate_runs": 8,             # get_scan.toml `calibrate_runs`
+    "benchmark": "bench/get_scan/run_with_policy.sh",   # relative to node/ in the deployed repo
+    "eval_timeout": 180,             # per-eval timeout (s)
+    "calibrate_runs": 8,             # noop baseline runs for the z-score stats
     "min_n": 2,
     "squash": "tanh",
     "lock_wait": 600,                # node-side eval-lock wait

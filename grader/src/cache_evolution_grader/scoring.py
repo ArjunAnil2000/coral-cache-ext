@@ -1,8 +1,8 @@
 """Scoring glue for the CORAL grader: probes, weights, calibration, feedback.
 
-Mirrors how mem-evolve's coordinator scored get_scan.toml:
+Scoring scheme for the get_scan workload:
   * probes  = evaluator.DEFAULT_PROBES + config-declared json_extract probes
-              (built node-side; see evolution/worker.py build_probes_from_specs)
+              (built node-side, node/eval_remote.py build_probes)
   * weights = [scoring.weights]; probes without positive weight or with
               direction "record" are not scored
   * score   = sum_w(w * tanh(+-z)) / sum_w(w), z against frozen noop-baseline
@@ -20,7 +20,7 @@ from typing import Any, Dict, List
 
 from cache_evolution_grader.normalization import NormalizationState
 
-# Defaults reproduce mem-evolve/cache_policy_evolution/get_scan.toml.
+# Defaults for the get_scan workload (throughput is directly scored).
 DEFAULT_PROBE_SPECS: List[Dict[str, Any]] = [
     {
         "type": "json_extract",

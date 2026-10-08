@@ -1,7 +1,7 @@
 [project]
 name = "cache-evolution-grader"
 version = "0.1.0"
-description = "CORAL grader wrapping mem-evolve's evaluator for cache_ext policy evolution (dry-run plumbing)"
+description = "CORAL grader for cache_ext policy evolution: grades over SSH on a CloudLab node and scores locally"
 requires-python = ">=3.11"
 dependencies = [
     "coral",

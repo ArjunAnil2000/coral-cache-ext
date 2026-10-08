@@ -233,21 +233,21 @@ def evaluate(binary, bench, **kw):
 
 
 class RemoteProtocolTests(unittest.TestCase):
-    """Run remote/eval_remote.py as a real subprocess against a stub evaluator."""
+    """Run node/eval_remote.py as a real subprocess against a stub evaluator."""
 
     def setUp(self):
         import subprocess, json  # noqa: E401
         self.subprocess, self.json = subprocess, json
         self.tmp = Path(tempfile.mkdtemp())
-        root = self.tmp / "cache_policy_evolution"
-        (root / "evaluator").mkdir(parents=True); (root / "eval" / "get_scan").mkdir(parents=True)
+        root = self.tmp / "node"
+        (root / "evaluator").mkdir(parents=True); (root / "bench" / "get_scan").mkdir(parents=True)
         (root / "evaluator" / "__init__.py").write_text(STUB_EVALUATOR)
-        (root / "eval" / "get_scan" / "run_with_policy.sh").write_text("#!/bin/bash\n")
-        self.env = dict(os.environ, MEM_EVOLVE_ROOT=str(root), EVO_LOCK_PATH=str(self.tmp / "lock"))
-        self.script = str(Path(__file__).resolve().parents[2] / "remote" / "eval_remote.py")
+        (root / "bench" / "get_scan" / "run_with_policy.sh").write_text("#!/bin/bash\n")
+        self.env = dict(os.environ, EVO_NODE_DIR=str(root), EVO_CACHE_EXT_DIR=str(self.tmp), EVO_LOCK_PATH=str(self.tmp / "lock"))
+        self.script = str(Path(__file__).resolve().parents[2] / "node" / "eval_remote.py")
 
     def call(self, **req):
-        base = {"policy_src": "ok", "runs": 2, "benchmark": "eval/get_scan/run_with_policy.sh",
+        base = {"policy_src": "ok", "runs": 2, "benchmark": "bench/get_scan/run_with_policy.sh",
                 "probes": [], "weights": {}, "eval_timeout": 5, "lock_wait": 2}
         base.update(req)
         p = self.subprocess.run([sys.executable, self.script], input=self.json.dumps(base),

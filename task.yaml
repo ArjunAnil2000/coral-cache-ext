@@ -5,8 +5,8 @@
 # seed policy, have the grader ssh to a CloudLab node that compiles it against
 # the real cache_ext toolchain, attaches it via BPF struct_ops, runs it under
 # the cgroup-isolated get_scan benchmark, and returns a score.
-# See coral-cache-evolution's sibling repo mem-evolve/coral-learnings.md for
-# the full migration research this is based on.
+# Everything this task uses lives in this repo: node/ (what runs on the CloudLab
+# node), third_party/cache_ext (submodule), grader/, seed/.
 
 task:
   name: cache-ext-get-scan
@@ -38,10 +38,11 @@ task:
     `SECTION: USERSPACE LOADER`. Keep both sections and the marker comments:
     the grader splits the file on them. The starting policy is a no-op that
     leaves eviction to the kernel's default reclaim (the score baseline).
-    Reference implementations to learn the cache_ext API from:
-    /home/aanil/Desktop/ldos/arjua-forks/cache_ext/policies/ (cache_ext_lib.bpf.h,
-    cache_ext_s3fifo.bpf.c, cache_ext_sampling.bpf.c, cache_ext_get_scan.bpf.c, ...)
-    and /home/aanil/Desktop/ldos/arjua-forks/mem-evolve/cache_policy_evolution/seeds/.
+    Reference implementations to learn the cache_ext API from are in
+    `reference/` inside your worktree (cache_ext_lib.bpf.h, cache_ext_s3fifo.bpf.c,
+    cache_ext_sampling.bpf.c, cache_ext_get_scan.bpf.c, ...; `*.bpf.c` is the kernel
+    side, `*.c` its userspace loader). They are not graded. Do not go looking for
+    other material outside your worktree.
 
     ## How you are graded
     You cannot compile or run anything locally (no cache_ext kernel here).
@@ -86,13 +87,13 @@ grader:
   # 600 + compile 300 + 180 + slack). Pre-calibrate to avoid the middle term.
   timeout: 4500
   direction: maximize
-  # Mirrors mem-evolve/cache_policy_evolution/get_scan.toml (2026-08-13 scoring).
+  # get_scan scoring: throughput directly scored (w=2.0), z-scored vs the noop baseline.
   args:
     policy_file: noop.c
-    # SSH backend: set up once with remote/install_remote.sh <ssh_target>.
+    # SSH backend: set up once with node/install_remote.sh <ssh_target>.
     ssh_target: aanil3@c220g1-030815.wisc.cloudlab.us
     ssh_key: ~/.ssh/coral_eval_ed25519
-    benchmark: eval/get_scan/run_with_policy.sh   # relative to MEM_EVOLVE_ROOT on the node
+    benchmark: bench/get_scan/run_with_policy.sh   # relative to node/ in the deployed repo
     eval_timeout: 180
     calibrate_runs: 8
     min_n: 2
@@ -115,10 +116,10 @@ grader:
 agents:
   count: 1
   runtime: claude_code
-  model: "claude-sonnet"   # matches the Bedrock alias already used by mem-evolve's [llm.mutator]
+  model: "claude-sonnet"   # alias in litellm_config.yaml (routes to Bedrock Opus 5.5)
   gateway:
     enabled: true
-    port: 4001              # distinct from mem-evolve's old coordinator proxy (idle on :4000)
+    port: 4001
     config: "./litellm_config.yaml"
 
 workspace:

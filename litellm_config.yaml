@@ -1,11 +1,9 @@
-# LiteLLM gateway config for CORAL's single agent. Mirrors the Bedrock setup
-# mem-evolve's old coordinator already uses (see mem-evolve/litellm-creds.sh
-# and [llm.mutator]/[llm.planner] in cache_policy_evolution/*.toml) so the
-# agent's model calls route through Bedrock credentials, not a direct
-# Anthropic/Claude API key.
+# LiteLLM gateway config for CORAL's agent(s). Model calls route through AWS
+# Bedrock using credentials from the environment (source ./litellm-creds.sh,
+# which is gitignored -- never commit it), not a direct Anthropic API key.
 #
-# Model id bedrock/us.anthropic.claude-opus-5-5 validated 2026-10-07 (alias "claude-sonnet" is
-# historical -- it routes to Opus 5.5).
+# Model id bedrock/us.anthropic.claude-opus-5-5 validated 2026-10-07. The alias
+# "claude-sonnet" is historical -- it routes to Opus 5.5.
 model_list:
   - model_name: "claude-sonnet"
     litellm_params:
