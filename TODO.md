@@ -30,6 +30,18 @@ noise seen before (noop controls ranged about -0.3..+0.4) but at the edge of it,
 re-check with repeated noop evals before trusting any score near 0. A fresh
 `coral start` on the new tree has not been run yet.
 
+**Second run (self-contained tree, 2026-10-08):** 5 real attempts + 1 tune, 0 grader
+errors; scores 0.59 (best, `bc478261`: S3-FIFO + three lists using the scan_pids
+oracle), 0.53, 0.52, 0.45, 0.27. Policy saved at `results/best/best_policy_run2_bc478261.c`.
+**Noise finding:** the agent submitted the same policy twice (second time with a
+comment-only diff) and got **0.92 as a `--tune` eval and 0.52 as a real eval**. Our grader
+treats tune and real evals identically, so this is pure single-eval noise: a spread of
+~0.4 on identical code, larger than the ±0.2-0.3 estimated earlier. Treat any single
+score as +-0.4; rank policies only after repeats (e.g. 8 evals each). The run also
+stalled 6 h because the dev laptop suspended (lid closed) mid-eval; use
+`systemd-inhibit` or disable lid suspend for long runs. Bedrock returned 503s for ~7 min
+at start and recovered by itself.
+
 ## Next steps
 
 1. Run repeated `noop` evals on the new tree (e.g. 8) to confirm the baseline is stable and
