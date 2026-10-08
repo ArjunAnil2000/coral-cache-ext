@@ -8,6 +8,75 @@
 # See coral-cache-evolution's sibling repo mem-evolve/coral-learnings.md for
 # the full migration research this is based on.
 
+task:
+  name: cache-ext-get-scan
+  description: |
+    Evolve a Linux page-cache eviction policy, written as an eBPF cache_ext
+    struct_ops program, to maximize throughput on a GET-SCAN workload.
+
+    ## Workload
+    GET-SCAN over LevelDB: a Zipfian-skewed keyspace (a small minority of hot
+    keys account for most traffic) under a 95%/5% GET/SCAN mix. Exactly one
+    worker thread issues large sequential range scans (500 keys/scan); the rest
+    issue point GETs against the hot-skewed distribution. The scan thread is
+    the adversary: big sequential scans evict the hot GET working set from
+    the cache. The benchmark runs in a memory-limited cgroup, so eviction
+    decisions matter.
+
+    ## Goal
+    Primary: maximize total throughput (ops/sec) -- equivalently minimize
+    bytes read from disk. Secondary: lower READ p99 latency without starving
+    SCAN throughput (a policy that merely delays scan-page eviction until
+    they are the only thing left just postpones the problem).
+
+    ## What you edit
+    `noop.c` (one file, the repo root of your worktree). It has two sections,
+    each wrapped in EVOLVE-BLOCK-START/END markers: `SECTION: BPF KERNEL CODE`
+    (the struct_ops hooks `evo_policy_init`, `evo_policy_evict_folios`,
+    `evo_policy_folio_added`, `evo_policy_folio_evicted`, optionally
+    `evo_policy_folio_accessed`, plus the `evo_policy_ops` struct) and
+    `SECTION: USERSPACE LOADER`. Keep both sections and the marker comments:
+    the grader splits the file on them. The starting policy is a no-op that
+    leaves eviction to the kernel's default reclaim (the score baseline).
+    Reference implementations to learn the cache_ext API from:
+    /home/aanil/Desktop/ldos/arjua-forks/cache_ext/policies/ (cache_ext_lib.bpf.h,
+    cache_ext_s3fifo.bpf.c, cache_ext_sampling.bpf.c, cache_ext_get_scan.bpf.c, ...)
+    and /home/aanil/Desktop/ldos/arjua-forks/mem-evolve/cache_policy_evolution/seeds/.
+
+    ## How you are graded
+    You cannot compile or run anything locally (no cache_ext kernel here).
+    Submit with `coral eval`. The grader ships your file to a dedicated
+    benchmark machine, which compiles it, attaches it via BPF struct_ops, and
+    runs the benchmark (~1 minute). You get back a score in [-1, 1]: a
+    weighted mean of tanh(z-score vs. the no-op baseline) over throughput
+    (weight 2.0), bytes read (0.5) and memory pressure (0.25). 0 = same as the
+    no-op baseline; higher is better. The feedback lists each probe's raw
+    value and contribution. Throughput dominates: reading fewer bytes does NOT
+    compensate for lower throughput. Compile errors come back with clang's
+    output. Evaluations are serialized on one machine, so be deliberate with
+    submissions.
+
+    ## Pitfalls (each costs an evaluation)
+    - `is_folio_relevant(folio)` is true for every file under the watched
+      directory, scan files included; it is not a hot/cold signal. Keep the
+      early `if (!is_folio_relevant(folio)) return;` guard in hooks that add
+      pages to your own lists; never manage non-watched pages (binary/libc/
+      anon) -- it causes reclaim loops and stalls.
+    - The BPF verifier rejects unbounded loops: use `bpf_for`/`bpf_repeat` with
+      a compile-time bound (cap at ~64, exit early).
+    - `INT64_MAX` is unavailable in BPF; use `0x7fffffffffffffffLL`.
+    - 64-bit division/modulo by a non-constant can fail to build in BPF; use
+      unsigned values and shifts/masks where possible.
+    - Globals the loader reads via `skel->bss->NAME` must be non-const, at file
+      scope, and actually referenced by BPF code.
+    - A policy that hangs past the 180 s eval timeout is strictly worse than
+      doing nothing.
+  tips: |
+    Start with a known design (e.g. scan-resistant two-list / S3-FIFO-style
+    admission) from the reference implementations rather than inventing from
+    scratch, then iterate on one change at a time. Record what you learn
+    (including dead ends) as notes.
+
 grader:
   entrypoint: "cache_evolution_grader.grader:Grader"
   setup:

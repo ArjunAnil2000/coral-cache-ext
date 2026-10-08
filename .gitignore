@@ -1,3 +1,4 @@
 cloudlab-instances.md
 litellm-creds.sh
 __pycache__/
+*.egg-info/

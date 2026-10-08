@@ -169,7 +169,7 @@ class Grader(TaskGrader):
             return self.fail(f"grader setup error: {e}")
 
         try:
-            policy_src = (self.codebase_path / cfg["policy_file"]).read_text()
+            policy_src = (Path(self.codebase_path) / cfg["policy_file"]).read_text()
         except OSError as e:
             return self.fail(f"cannot read policy file {cfg['policy_file']}: {e}")
 

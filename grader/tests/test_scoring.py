@@ -21,7 +21,7 @@ coral = types.ModuleType("coral"); cg = types.ModuleType("coral.grader")
 class TaskGrader:
     def __init__(self, args=None, codebase_path=None):
         self.args = args or {}
-        self.codebase_path = Path(codebase_path or ".")
+        self.codebase_path = str(codebase_path or ".")  # real coral passes a str
 
     def fail(self, msg):
         return ("fail", msg)
