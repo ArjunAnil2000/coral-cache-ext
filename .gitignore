@@ -2,3 +2,4 @@ cloudlab-instances.md
 litellm-creds.sh
 __pycache__/
 *.egg-info/
+results/cache-ext-get-scan/
