@@ -2,51 +2,41 @@
 
 ## Status (2026-10-08)
 
-The repo is self-contained (`node/` + `third_party/cache_ext` submodule) and the SSH
-eval backend is deployed to the CloudLab node `c220g1-030815` at
-`/mydata/coral-cache-evolution`.
+All earlier runs, their results and the cached noop calibration were deleted on
+2026-10-08 to start from scratch. Nothing is running. The next run recalibrates the noop
+baseline on its first grade (8 evals, ~6 min) or via the calibrate CLI (see how-to-run.md).
 
-**Verified**
-- Local tests pass (19), including `node/eval_remote.py` run as a real subprocess
-  against a stub evaluator.
-- On the node, from the self-contained tree: forced-command key is restricted (no
-  shell, path escapes rejected), benchmark stack builds from the repo
-  (`node/bench/get_scan/setup.sh`), and a real `noop` compile + eval returns valid
-  probes.
-- Bedrock model `bedrock/us.anthropic.claude-opus-5-5` answers via litellm.
-- A full 5-attempt `coral start` run (before the self-contained move, same
-  grader logic): 0 grader errors, scores 0.72 / 0.65 / 0.48 / 0.43 / -0.31, agent
-  traffic went through the :4001 gateway to Bedrock.
-- Re-measuring the best policy (8 runs) against a `noop` control (8 runs): policy
-  score 0.79 ± 0.24, throughput 1271 ± 22 ops/s; noop 0.005 ± 0.23, 1224 ± 14 ops/s
-  (about +4% throughput). Single-eval leaderboard scores are optimistic.
+The repo is self-contained (`node/` + `third_party/cache_ext` submodule) and the SSH eval
+backend is deployed to the CloudLab node `c220g1-030815` at `/mydata/coral-cache-evolution`
+(benchmark DB at `/mydata/coral_get_scan_db`, kept: it is data, and a fresh DB makes the
+first eval unrepresentative).
 
-**After the move:** `coral validate` passes on the self-contained tree
-(`/mydata/coral-cache-evolution`, new benchmark DB at `/mydata/coral_get_scan_db`).
-New noop calibration (n=8): throughput 1211.6 ± 24 ops/s, iostat 3.20e8 ± 6.1e6,
-refaults 51369 ± 1465. The unchanged `noop` seed scored **-0.50** on that validate
-run (throughput z=-0.88, the other probes at ~0). That is within the single-eval
-noise seen before (noop controls ranged about -0.3..+0.4) but at the edge of it, so
-re-check with repeated noop evals before trusting any score near 0. A fresh
-`coral start` on the new tree has not been run yet.
+**Verified (infrastructure only)**
+- Local tests pass (19), including `node/eval_remote.py` as a real subprocess against a stub evaluator.
+- On the node: the forced-command key is restricted (no shell, path escapes rejected), the
+  benchmark stack builds from the repo, and `coral validate` passes end to end.
+- Bedrock model `bedrock/us.anthropic.claude-opus-5-5` answers via litellm and through
+  CORAL's :4001 gateway; two bounded `coral start` runs completed with 0 grader errors.
 
-**Second run (self-contained tree, 2026-10-08):** 5 real attempts + 1 tune, 0 grader
-errors; scores 0.59 (best, `bc478261`: S3-FIFO + three lists using the scan_pids
-oracle), 0.53, 0.52, 0.45, 0.27. Policy saved at `results/best/best_policy_run2_bc478261.c`.
-**Noise finding:** the agent submitted the same policy twice (second time with a
-comment-only diff) and got **0.92 as a `--tune` eval and 0.52 as a real eval**. Our grader
-treats tune and real evals identically, so this is pure single-eval noise: a spread of
-~0.4 on identical code, larger than the ±0.2-0.3 estimated earlier. Treat any single
-score as +-0.4; rank policies only after repeats (e.g. 8 evals each). The run also
-stalled 6 h because the dev laptop suspended (lid closed) mid-eval; use
-`systemd-inhibit` or disable lid suspend for long runs. Bedrock returned 503s for ~7 min
-at start and recovered by itself.
+**Lessons from the earlier runs (operational, no results)**
+- Single-eval noise is large. The same code scored 0.92 and 0.52 on two evals (our grader
+  treats `--tune` and real evals identically), and the unchanged noop seed has scored -0.50.
+  Never rank policies from single evals; repeat (e.g. 8 evals each) before comparing.
+- The score is dominated by bytes-read / refault z-scores when those baselines are tight
+  (a ~5% drop is ~3 sigma and saturates tanh), so score rank and throughput rank can differ.
+  If throughput is the goal, report absolute throughput alongside the score.
+- The agent reads the grader source by CORAL's design (`.claude/grader/` is a symlink to
+  `grader/`). It also found earlier results elsewhere on the machine when the task
+  description pointed at them; keep any reference material inside the worktree.
+- A run freezes if the dev machine suspends (lid closed): use `systemd-inhibit` or
+  disable lid suspend. Bedrock occasionally returns 503s for several minutes; the agent's
+  built-in retries ride it out.
+- `run.session: local` means no tmux; the agent is a child process of the manager.
 
 ## Next steps
 
-1. Run repeated `noop` evals on the new tree (e.g. 8) to confirm the baseline is stable and
-   the -0.50 seed score was noise, then a bounded `coral start` and compare with the
-   pre-move run.
+1. Fresh bounded `coral start` (nothing queued yet); calibrate first so the first agent
+   eval is not slowed by it.
 2. Exercise `node/setup_node.sh` on a genuinely fresh node (it has only been
    syntax-checked; the existing node was provisioned before it was written).
 3. Decide how to handle the agent reading material outside its worktree. Agents run

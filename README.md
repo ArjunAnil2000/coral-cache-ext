@@ -90,9 +90,9 @@ frozen stats of the `noop` baseline (8 calibration runs, cached locally):
 - stats are frozen after calibration and fingerprinted on (probes, weights, ssh
   target + benchmark, baseline source); a mismatch recalibrates automatically
 
-Measurement noise is real: the noop baseline's throughput std is ~2.5%, and a
-single eval of an unchanged policy moves the score by roughly ±0.2–0.3. Repeat
-evals before trusting small differences.
+Measurement noise is large: the noop baseline's throughput std is ~2%, and identical
+code has scored 0.92 and 0.52 on two single evals. Repeat evals (e.g. 8) before
+comparing policies, and look at absolute throughput, not just the score.
 
 ## Design decisions
 
