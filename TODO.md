@@ -1,18 +1,19 @@
 # TODO
 
-Status as of 2026-10-07: SSH-backend grader implemented and committed. Local tests
-pass (19). **Verified on the node (`c220g1-030815`):** forced-command key works and
-is restricted; real `noop` compile + get_scan eval through the backend returns
-valid probes (throughput ~1224 ops/s, 44s). **Not yet verified:** the real
-`coral` `TaskGrader` end-to-end (`coral validate`), calibration,
-a full agent run.
+Status as of 2026-10-07: SSH-backend grader implemented and committed; local tests
+pass (19). **Verified:** `coral validate` passes end to end against node `c220g1-030815`
+(real TaskGrader API, remote compile/attach/get_scan, 8-run noop calibration, seed score
+0.0104 ~ 0 as expected); forced-command key is restricted; Bedrock model id answers via
+litellm. Noop baseline: throughput 1219.7 +- 30.8 ops/s (n=8, ~2.5% std), iostat
+3.19e8 +- 7.7e6, ~40s per eval. **Not yet verified:** a full `coral start` agent run,
+the model call through CORAL's :4001 gateway, whether Claude Code honors the injected
+ANTHROPIC_API_KEY over a stored login.
 
 ## Next steps
 
 1. ~~Validate the Bedrock model id~~ DONE 2026-10-07: `bedrock/us.anthropic.claude-opus-5-5` answered a litellm call with the creds in `litellm-creds.sh`. Still untested *through CORAL's gateway* (alias `claude-sonnet` actually routes to Opus 5.5; consider renaming the alias).
-2. `coral validate -c task.yaml` (exercises the real TaskGrader API + the whole
-   grade path, incl. first-grade calibration).
-3. Pre-calibrate and sanity-check the noop stats (std not ~0; n=8).
+2. ~~`coral validate`~~ DONE (stats cached at `~/.cache/cache_evolution_grader/get_scan_noop_stats.json`; delete if the node changes).
+3. Note the noise floor: a single noop re-run scores ~N(0, ~0.3) per component, so small scores are noise; consider repeats before trusting small wins.
 4. `coral start -c task.yaml`; confirm an attempt lands in `.coral/public/attempts/`
    and model calls go through the :4001 gateway.
 
