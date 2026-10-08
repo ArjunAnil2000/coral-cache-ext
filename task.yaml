@@ -1,9 +1,10 @@
 # CORAL task: dry plumbing run for cache_ext page-cache policy evolution.
 #
 # Goal of this task definition is NOT a real experiment — it's a minimal
-# end-to-end proof that one CORAL agent can edit the seed policy, have the
-# grader compile it against the real cache_ext toolchain, attach it via BPF
-# struct_ops, run it under the cgroup-isolated benchmark, and return a score.
+# end-to-end proof that one CORAL agent (running on THIS host) can edit the
+# seed policy, have the grader ssh to a CloudLab node that compiles it against
+# the real cache_ext toolchain, attaches it via BPF struct_ops, runs it under
+# the cgroup-isolated get_scan benchmark, and returns a score.
 # See coral-cache-evolution's sibling repo mem-evolve/coral-learnings.md for
 # the full migration research this is based on.
 
@@ -11,22 +12,24 @@ grader:
   entrypoint: "cache_evolution_grader.grader:Grader"
   setup:
     - "uv pip install -e ./grader"
-  # Must cover: lock wait (600) + compile + one eval (180, = get_scan.toml
-  # `timeout`) -- and, on the very first grade if not pre-calibrated with
-  # `python -m cache_evolution_grader.calibrate`, calibrate_runs * 180 more
-  # for the noop baseline. 120 was too short even for a single eval.
-  timeout: 2700
+  # Worst case: local calibration lock (600) + first-grade calibration call
+  # (node lock 600 + compile 300 + 8*180 + slack) + one grade call (node lock
+  # 600 + compile 300 + 180 + slack). Pre-calibrate to avoid the middle term.
+  timeout: 4500
   direction: maximize
   # Mirrors mem-evolve/cache_policy_evolution/get_scan.toml (2026-08-13 scoring).
   args:
     policy_file: noop.c
+    # SSH backend: set up once with remote/install_remote.sh <ssh_target>.
+    ssh_target: aanil3@c220g1-030815.wisc.cloudlab.us
+    ssh_key: ~/.ssh/coral_eval_ed25519
+    benchmark: eval/get_scan/run_with_policy.sh   # relative to MEM_EVOLVE_ROOT on the node
     eval_timeout: 180
     calibrate_runs: 8
     min_n: 2
     squash: tanh
     lock_wait: 600
-    stats_path: /run/evo_cache/get_scan_noop_stats.json
-    # benchmark_script / source_dir / baseline_source default from MEM_EVOLVE_ROOT.
+    stats_path: ~/.cache/cache_evolution_grader/get_scan_noop_stats.json
     required_probes: [throughput]
     weights:
       throughput: 2.0

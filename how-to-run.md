@@ -1,139 +1,71 @@
 # How to run
 
-Operational runbook for launching the dry-plumbing CORAL run. For why things
-are structured this way, see `README.md`; for open items / status, see
-`TODO.md`. This assumes the CloudLab node is reachable — if `ssh
-aanil3@<host>` times out or is refused, stop here and see `TODO.md`'s
-"Blocked on" section first.
+Operational runbook. Design: `README.md`. Status/open items: `TODO.md`.
+Everything runs on the **dev host** (this machine) except what `eval_remote.py`
+does on the CloudLab node.
 
-## Prerequisites (on the CloudLab node)
+## Prerequisites
 
-- The existing `mem-evolve` checkout at its usual path (default assumed
-  below: `/mydata/evo_cache/cache_policy_evolution`), with the
-  `6.6.8-cache-ext` kernel already booted, `clang-14`/`bpftool` installed,
-  and `setup_isolation.sh` already run (so `cache_ext_bench` cgroup
-  exists). This run does not redo any of `mem-evolve/setup_cloudlab.sh` —
-  if that hasn't been done yet, do it first.
-- Python 3.11+ and `uv` on the node (`coral`'s install script and the
-  grader's `setup` step both use `uv`).
-- `kernel.bpf_stats_enabled` is not required for this dry run (that's only
-  for the throughput-exp profiling work), but doesn't hurt if already set.
+- Node reachable: `ssh aanil3@<host> true` (host in `cloudlab-instances.md`),
+  already provisioned with the cache-ext kernel, `clang-14`, `bpftool`, the
+  `cache_ext_evo_bench` cgroup, the get_scan stack, and the mem-evolve checkout
+  at `/mydata/evo_cache/` (`setup_node.sh` does this on a fresh node).
+- Dev host: `coral` CLI (needs Python 3.11-3.13; on a 3.14-only box:
+  `uv python install 3.12 && uv tool install --force --python 3.12 git+https://github.com/Human-Agent-Society/CORAL.git`),
+  `claude` CLI for the `claude_code` runtime, `ssh`.
 
-## 1. Get this repo onto the node
-
-From the dev machine:
+## 1. One-time: install the SSH backend on the node
 
 ```bash
-# option A: push to a remote git host, then clone on the node
-cd /home/aanil/Desktop/ldos/arjua-forks/coral-cache-evolution
-git remote add origin <your-remote-url>
-git push -u origin master
-ssh aanil3@<host> "git clone <your-remote-url> /mydata/evo_cache/coral-cache-evolution"
-
-# option B: copy directly, no remote needed
-rsync -av --exclude=.git \
-  /home/aanil/Desktop/ldos/arjua-forks/coral-cache-evolution/ \
-  aanil3@<host>:/mydata/evo_cache/coral-cache-evolution/
+./remote/install_remote.sh aanil3@<host>      # key ~/.ssh/coral_eval_ed25519, script, forced command
 ```
+Then set `grader.args.ssh_target` / `ssh_key` in `task.yaml` (already filled for
+the current node). Re-run after a node is replaced.
 
-Everything below runs **on the node**, from
-`/mydata/evo_cache/coral-cache-evolution/` (adjust the path if you put it
-somewhere else).
-
-## 2. Install the CORAL CLI
+## 2. Tests (no node needed)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Human-Agent-Society/CORAL/main/install.sh | sh
-coral --version   # sanity check
+python3 -I grader/tests/test_scoring.py
 ```
 
-## 3. Fill in the Bedrock model id
-
-Open `litellm_config.yaml` and replace the placeholder:
-
-```yaml
-model_list:
-  - model_name: "claude-sonnet"
-    litellm_params:
-      model: "bedrock/anthropic.claude-sonnet-TODO"   # <- replace this
-```
-
-Confirm the exact model id string against whatever `mem-evolve`'s existing
-litellm proxy config on this node already uses (same model the old
-`[llm.mutator]` TOML blocks point at under the `claude-sonnet` alias).
-
-## 4. Export Bedrock credentials
+## 3. Bedrock credentials + model id
 
 ```bash
-cd /mydata/evo_cache/cache_policy_evolution/..   # wherever mem-evolve lives on the node
-source mem-evolve/litellm-creds.sh
+source ./litellm-creds.sh      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION
 ```
+`litellm_config.yaml` maps alias `claude-sonnet` to the Bedrock model id.
+**The model id has not been validated yet** (credentials have).
 
-This needs to export `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
-`AWS_DEFAULT_REGION` for `litellm_config.yaml`'s `os.environ/...`
-references to resolve. The dev-machine copy of this file only had
-`AWS_ACCESS_KEY_ID` — if the node's copy is similarly incomplete, add the
-missing exports there (don't commit them to this repo).
-
-## 5. Confirm `MEM_EVOLVE_ROOT`
+## 4. Pre-calibrate the noop baseline (~8 evals, ~6 min)
 
 ```bash
-export MEM_EVOLVE_ROOT=/mydata/evo_cache/cache_policy_evolution   # only if it differs from the default
+cd grader && PYTHONPATH=src python3 -m cache_evolution_grader.calibrate \
+  ssh_target=aanil3@<host> ssh_key=~/.ssh/coral_eval_ed25519     # add --force to redo
 ```
+Needs `coral` importable (use the grader venv) — or just let the first grade do it
+(then the grader timeout must cover it; `task.yaml` does).
 
-The grader (`grader/src/cache_evolution_grader/grader.py`) defaults to this
-path already — only set the env var if the node's actual layout differs.
-
-## 6. Launch
+## 5. Launch
 
 ```bash
-cd /mydata/evo_cache/coral-cache-evolution
+coral validate -c task.yaml     # runs the grader on the seed
 coral start -c task.yaml
 ```
 
-This will:
-- run `grader`'s `setup` step (`uv pip install -e ./grader`) to install the
-  grader package into CORAL's isolated grader venv,
-- start CORAL's LiteLLM gateway on port 4001 using `litellm_config.yaml`,
-- spin up 1 Claude Code agent in its own git worktree of `seed/`,
-- let the agent make at least one edit/commit,
-- run the grader subprocess (`compile_policy()` → `evaluate()` under the
-  `fcntl.flock` eval lock) against the real kernel and benchmark cgroup,
-- record the result under `.coral/public/attempts/`.
-
-## 7. Verify it worked
+## 6. Verify
 
 ```bash
-# the attempt record should exist with a score + feedback text
+coral status; coral log
 ls .coral/public/attempts/
-cat .coral/public/attempts/<latest>.json   # or whatever extension CORAL uses
-
-# confirm the agent actually edited seed/ and committed
-git -C <agent-worktree-path> log --oneline   # worktree path is printed by `coral start`
-
-# confirm the gateway, not a direct Anthropic key, backed the model calls
 curl -s localhost:4001/health
-env | grep ANTHROPIC_API_KEY   # should be unset/unused for this run
-
-# confirm no collision with the old coordinator's proxy
-ss -tlnp | grep ':4000\|:4001'
 ```
+On the node afterwards: `sudo bpftool struct_ops show` (nothing attached) and
+`sudo fuser /run/evo_cache/eval.lock` (nobody holding it).
 
-If the grader step fails, check:
-- `compile_policy()` errors — usually a stale `cache_ext/policies/`
-  checkout or a clang version mismatch.
-- `evaluate()` timing out or failing to attach — check whether another
-  process (e.g. a leftover old-coordinator run) already holds the
-  struct_ops slot or the `/run/evo_cache/eval.lock` file lock.
+## Troubleshooting
 
-## Stopping / cleaning up
-
-```bash
-# Ctrl-C the coral start process, or:
-coral stop   # if a subcommand for this exists — check `coral --help`
-```
-
-Check `/run/evo_cache/eval.lock` and the BPF struct_ops attachment are
-released after a run (`bpftool struct_ops show`) before starting another
-one — a stuck lock or lingering attachment from a crashed run will block
-the next `coral start`.
+- `grader infrastructure error ... ssh`: node down/unreachable or key not installed.
+- `eval node busy`: another eval (or a stale old-coordinator run) holds the node lock.
+- `compile failed`: the message includes clang's stderr from the node.
+- Stats stale after changing probes/weights/baseline: automatic (fingerprint);
+  after a node move: delete `stats_path` or pass `--force`.

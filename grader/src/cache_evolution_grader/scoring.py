@@ -2,14 +2,14 @@
 
 Mirrors how mem-evolve's coordinator scored get_scan.toml:
   * probes  = evaluator.DEFAULT_PROBES + config-declared json_extract probes
-              (see evolution/worker.py build_probes_from_specs)
+              (built node-side; see evolution/worker.py build_probes_from_specs)
   * weights = [scoring.weights]; probes without positive weight or with
               direction "record" are not scored
   * score   = sum_w(w * tanh(+-z)) / sum_w(w), z against frozen noop-baseline
               mean/stddev (update_during_evolution = false)
 
-The pure functions here (config parsing, scoring, formatting) do not need the
-`evaluator` package or `coral`; only build_probes() imports `evaluator`.
+The functions here are pure (no `evaluator`, no `coral`, no ssh): probes are
+built on the node by remote/eval_remote.py from the same specs.
 """
 
 from __future__ import annotations
@@ -36,27 +36,6 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
     "cgroup_iostat": 0.5,
     "cgroup_memstat": 0.25,
 }
-
-
-def build_probes(specs: List[Dict[str, Any]]) -> list:
-    """DEFAULT_PROBES + json_extract probes (same shape as the coordinator)."""
-    from evaluator import DEFAULT_PROBES, JsonExtractProbe  # needs MEM_EVOLVE_ROOT on sys.path
-
-    probes = list(DEFAULT_PROBES)
-    for s in specs:
-        kind = (s.get("type") or "").lower()
-        if kind not in ("json_extract", "json"):
-            raise ValueError(f"unknown probe type {kind!r}")
-        probes.append(
-            JsonExtractProbe(
-                name=s["name"],
-                results_path=s["results_file"],
-                json_path=s["json_path"],
-                direction=s.get("direction", "maximize"),
-                unit=s.get("unit", ""),
-            )
-        )
-    return probes
 
 
 def fingerprint(specs, weights, benchmark: str, baseline_src: str) -> str:

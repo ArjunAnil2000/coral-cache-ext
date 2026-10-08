@@ -1,64 +1,66 @@
 """CORAL grader for cache_ext policy evolution on the get_scan workload.
 
+Topology: CORAL (manager, agents, THIS grader subprocess) runs on a dev host
+with no special kernel. Agents only edit the policy .c file. To grade, this
+grader ssh-es to a CloudLab node (remote.py -> remote/eval_remote.py), which
+compiles the policy, attaches it via BPF struct_ops, runs the cgroup-isolated
+get_scan benchmark, and returns the raw probe values. Scoring happens HERE.
+
 Scores the way mem-evolve's coordinator did for get_scan.toml (as changed on
 2026-08-13): probes = evaluator DEFAULT_PROBES + a `throughput` json_extract
 probe (results.json -> throughput_ops_per_sec, maximize); weights
 throughput=2.0, cgroup_iostat=0.5, cgroup_memstat=0.25; each probe is
 z-scored against frozen stats from the `noop` baseline, tanh-squashed, and
-combined as a weighted mean. `result.score` from evaluator.evaluate() (a raw
-unit-less weighted sum) is ignored.
+combined as a weighted mean. The node's raw `score` is ignored.
 
 All knobs live in task.yaml `grader.args` (see DEFAULTS below).
 
 Calibration: the noop baseline stats are computed lazily on the first grade
-(or ahead of time with `python -m cache_evolution_grader.calibrate`), under
-the same flock as grading, and cached as JSON at `stats_path` (default
-/run/evo_cache/get_scan_noop_stats.json). The file carries a fingerprint of
-(probe specs, weights, benchmark, baseline source); a mismatch triggers
-recalibration. /run is tmpfs, so stats are recomputed after a reboot, which
-is desirable: they describe the machine's current state. Stats are then
-frozen (never updated by graded policies), matching
-update_during_evolution = false. To use hand-frozen stats, place a file with
-the right fingerprint at stats_path, or point stats_path somewhere durable.
+(or ahead of time with `python -m cache_evolution_grader.calibrate`) by one
+remote call that compiles baseline_noop.c once and runs it `calibrate_runs`
+times, and are cached as JSON at `stats_path` (local to this host). The file
+carries a fingerprint of (probe specs, weights, benchmark, ssh target,
+baseline source); a mismatch triggers recalibration. Stats are then frozen
+(never updated by graded policies), matching update_during_evolution = false.
 
-Serialization: BPF struct_ops attach is global/exclusive and compile_policy()
-mutates the shared cache_ext/policies/ dir, so compile + eval (and
-calibration) happen under a cross-process flock. The lock wait is polled with
-a deadline (`lock_wait`) so we return a useful failure instead of being
-killed by the CORAL grader timeout.
+Serialization: the node holds the exclusive eval flock (struct_ops slot,
+shared cache_ext/policies/), so concurrent grader subprocesses just queue
+there. A local flock only prevents two graders calibrating at once.
 
 Timeout budget (task.yaml grader.timeout must exceed all of this):
   lock_wait + compile + eval_timeout (+ calibrate_runs * eval_timeout on the
-  very first grade if not pre-calibrated).
+  very first grade if not pre-calibrated), see remote.total_timeout().
 """
 
 import fcntl
 import os
-import sys
 import time
 from pathlib import Path
 
 from coral.grader import TaskGrader
 
-from cache_evolution_grader import scoring
+from cache_evolution_grader import remote, scoring
 from cache_evolution_grader.normalization import NormalizationState, extract_raw_values
 
-MEM_EVOLVE_ROOT = Path(
-    os.environ.get("MEM_EVOLVE_ROOT", "/mydata/evo_cache/cache_policy_evolution")
-)
-LOCK_PATH = "/run/evo_cache/eval.lock"
+BASELINE_SOURCE = Path(__file__).with_name("baseline_noop.c")
 
 DEFAULTS = {
     "policy_file": "noop.c",
-    "benchmark_script": None,        # -> MEM_EVOLVE_ROOT/eval/get_scan/run_with_policy.sh
-    "source_dir": None,              # -> MEM_EVOLVE_ROOT/../cache_ext (benchmark cwd, policies/)
-    "baseline_source": None,         # -> MEM_EVOLVE_ROOT/seeds/noop.c
+    # --- ssh backend ---
+    "ssh_target": None,              # REQUIRED, e.g. "evo-eval@c220g1-030815.wisc.cloudlab.us"
+    "ssh_key": None,                 # path to the (forced-command) private key; None = ssh default
+    "ssh_options": [],               # extra ssh args, e.g. ["-p", "2222"]
+    "ssh_connect_timeout": 15,
+    "remote_command": "sudo -n env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin "
+                      "python3.11 /mydata/evo_cache/coral-remote/eval_remote.py",
+    # --- benchmark / scoring ---
+    "benchmark": "eval/get_scan/run_with_policy.sh",   # relative to MEM_EVOLVE_ROOT on the node
     "eval_timeout": 180,             # get_scan.toml `timeout`
     "calibrate_runs": 8,             # get_scan.toml `calibrate_runs`
     "min_n": 2,
     "squash": "tanh",
-    "lock_wait": 600,
-    "stats_path": "/run/evo_cache/get_scan_noop_stats.json",
+    "lock_wait": 600,                # node-side eval-lock wait
+    "stats_path": "~/.cache/cache_evolution_grader/get_scan_noop_stats.json",
     "weights": scoring.DEFAULT_WEIGHTS,
     "probes": scoring.DEFAULT_PROBE_SPECS,
     "required_probes": ["throughput"],
@@ -68,39 +70,29 @@ DEFAULTS = {
 def load_config(args):
     cfg = dict(DEFAULTS)
     cfg.update({k: v for k, v in (args or {}).items() if v is not None})
-    cfg["benchmark_script"] = cfg["benchmark_script"] or str(
-        MEM_EVOLVE_ROOT / "eval" / "get_scan" / "run_with_policy.sh"
-    )
-    cfg["source_dir"] = cfg["source_dir"] or str(MEM_EVOLVE_ROOT.parent / "cache_ext")
-    cfg["baseline_source"] = cfg["baseline_source"] or str(MEM_EVOLVE_ROOT / "seeds" / "noop.c")
+    if not cfg["ssh_target"]:
+        raise ValueError("grader.args.ssh_target is required (e.g. user@host of the CloudLab node)")
     cfg["weights"] = {k: float(v) for k, v in cfg["weights"].items()}
-    cfg["eval_timeout"] = int(cfg["eval_timeout"])
-    cfg["calibrate_runs"] = int(cfg["calibrate_runs"])
-    cfg["min_n"] = int(cfg["min_n"])
-    cfg["lock_wait"] = int(cfg["lock_wait"])
+    for k in ("eval_timeout", "calibrate_runs", "min_n", "lock_wait", "ssh_connect_timeout"):
+        cfg[k] = int(cfg[k])
+    cfg["stats_path"] = os.path.expanduser(cfg["stats_path"])
+    if cfg["ssh_key"]:
+        cfg["ssh_key"] = os.path.expanduser(cfg["ssh_key"])
     return cfg
-
-
-def _load_evaluator():
-    if str(MEM_EVOLVE_ROOT) not in sys.path:
-        sys.path.insert(0, str(MEM_EVOLVE_ROOT))
-    from evaluator import compile_policy, evaluate  # noqa: E402
-
-    return compile_policy, evaluate
 
 
 class LockTimeout(Exception):
     pass
 
 
-class EvalLock:
-    """Cross-process flock with a bounded wait."""
+class LocalLock:
+    """Cross-process flock with a bounded wait (only guards local calibration)."""
 
-    def __init__(self, path=LOCK_PATH, wait=600):
+    def __init__(self, path, wait=600):
         self.path, self.wait, self.fd = path, wait, None
 
     def __enter__(self):
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
         self.fd = open(self.path, "w")
         deadline = time.monotonic() + self.wait
         while True:
@@ -120,37 +112,36 @@ class EvalLock:
             self.fd.close()
 
 
-def ensure_calibration(cfg, compile_policy=None, evaluate=None, now=time.time):
+def calibration_fingerprint(cfg, baseline_src):
+    return scoring.fingerprint(
+        cfg["probes"], cfg["weights"], f"{cfg['ssh_target']}:{cfg['benchmark']}", baseline_src
+    )
+
+
+def ensure_calibration(cfg, run_remote=None, now=time.time):
     """Return (NormalizationState, meta) for the noop baseline.
 
-    MUST be called while holding the eval lock (compiles + runs benchmarks).
-    Raises RuntimeError with a human-readable message on failure.
+    Raises RuntimeError with a human-readable message on failure. Callers
+    should hold LocalLock(stats_path + '.lock') so two graders don't both
+    calibrate.
     """
-    if compile_policy is None or evaluate is None:
-        compile_policy, evaluate = _load_evaluator()
-    specs = cfg["probes"]
-    baseline_src = Path(cfg["baseline_source"]).read_text()
-    fp = scoring.fingerprint(specs, cfg["weights"], cfg["benchmark_script"], baseline_src)
+    run_remote = run_remote or remote.run_remote
+    baseline_src = BASELINE_SOURCE.read_text()
+    fp = calibration_fingerprint(cfg, baseline_src)
     cached = scoring.load_stats(cfg["stats_path"], fp)
     if cached is not None:
         return cached
 
-    policies_dir = os.path.join(cfg["source_dir"], "policies")
-    compiled = compile_policy(baseline_src, policies_dir)
+    try:
+        compiled, results = run_remote(cfg, baseline_src, runs=cfg["calibrate_runs"])
+    except (remote.RemoteError, remote.RemoteBusy) as e:
+        raise RuntimeError(f"calibration: {e}")
     if not compiled.ok:
-        raise RuntimeError(f"calibration: noop baseline failed to compile: {compiled.error}")
+        raise RuntimeError(f"calibration: noop baseline failed to compile: {compiled.error} {compiled.stderr_tail[-400:]}")
 
     state = NormalizationState(squash=cfg["squash"], min_n=cfg["min_n"])
     errors, ok = [], 0
-    for i in range(cfg["calibrate_runs"]):
-        res = evaluate(
-            compiled.binary_path,
-            cfg["benchmark_script"],
-            timeout=cfg["eval_timeout"],
-            cwd=cfg["source_dir"],
-            probes=scoring.build_probes(specs),
-            weights=cfg["weights"],
-        )
+    for i, res in enumerate(results):
         if not res.ok:
             errors.append(f"run {i}: {res.error}")
             continue
@@ -174,40 +165,33 @@ class Grader(TaskGrader):
     def evaluate(self):
         try:
             cfg = load_config(self.args)
-            compile_policy, evaluate = _load_evaluator()
-        except Exception as e:  # bad config / missing MEM_EVOLVE_ROOT
-            return self.fail(f"grader setup error (MEM_EVOLVE_ROOT={MEM_EVOLVE_ROOT}): {e}")
+        except Exception as e:
+            return self.fail(f"grader setup error: {e}")
 
         try:
             policy_src = (self.codebase_path / cfg["policy_file"]).read_text()
         except OSError as e:
             return self.fail(f"cannot read policy file {cfg['policy_file']}: {e}")
 
-        policies_dir = os.path.join(cfg["source_dir"], "policies")
         try:
-            with EvalLock(wait=cfg["lock_wait"]):
+            with LocalLock(cfg["stats_path"] + ".lock", wait=cfg["lock_wait"]):
                 try:
-                    state, meta = ensure_calibration(cfg, compile_policy, evaluate)
+                    state, meta = ensure_calibration(cfg)
                 except Exception as e:
                     return self.fail(f"grader calibration error (not your policy's fault): {e}")
-
-                compiled = compile_policy(policy_src, policies_dir)
-                if not compiled.ok:
-                    return self.fail(f"compile failed: {compiled.error}")
-
-                result = evaluate(
-                    compiled.binary_path,
-                    cfg["benchmark_script"],
-                    timeout=cfg["eval_timeout"],
-                    cwd=cfg["source_dir"],
-                    probes=scoring.build_probes(cfg["probes"]),
-                    weights=cfg["weights"],
-                )
+            compiled, results = remote.run_remote(cfg, policy_src, runs=1)
         except LockTimeout as e:
             return self.fail(f"grader busy: {e}; resubmit")
+        except remote.RemoteBusy as e:
+            return self.fail(f"eval node busy: {e}; resubmit")
+        except remote.RemoteError as e:
+            return self.fail(f"grader infrastructure error (not your policy's fault; resubmit): {e}")
         except Exception as e:
             return self.fail(f"grader internal error: {type(e).__name__}: {e}")
 
+        if not compiled.ok:
+            return self.fail(f"compile failed: {compiled.error}\n{compiled.stderr_tail}")
+        result = results[0]
         if not result.ok:
             return self.fail(result.feedback_text())
 
