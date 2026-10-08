@@ -11,8 +11,34 @@ grader:
   entrypoint: "cache_evolution_grader.grader:Grader"
   setup:
     - "uv pip install -e ./grader"
-  timeout: 120
+  # Must cover: lock wait (600) + compile + one eval (180, = get_scan.toml
+  # `timeout`) -- and, on the very first grade if not pre-calibrated with
+  # `python -m cache_evolution_grader.calibrate`, calibrate_runs * 180 more
+  # for the noop baseline. 120 was too short even for a single eval.
+  timeout: 2700
   direction: maximize
+  # Mirrors mem-evolve/cache_policy_evolution/get_scan.toml (2026-08-13 scoring).
+  args:
+    policy_file: noop.c
+    eval_timeout: 180
+    calibrate_runs: 8
+    min_n: 2
+    squash: tanh
+    lock_wait: 600
+    stats_path: /run/evo_cache/get_scan_noop_stats.json
+    # benchmark_script / source_dir / baseline_source default from MEM_EVOLVE_ROOT.
+    required_probes: [throughput]
+    weights:
+      throughput: 2.0
+      cgroup_iostat: 0.5
+      cgroup_memstat: 0.25
+    probes:
+      - type: json_extract
+        name: throughput
+        results_file: results.json
+        json_path: throughput_ops_per_sec
+        direction: maximize
+        unit: ops/s
 
 agents:
   count: 1

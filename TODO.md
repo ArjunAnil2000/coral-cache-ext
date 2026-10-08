@@ -98,9 +98,9 @@ this local checkout is staging only.
 - **`agents.count` above 1** — multi-agent coordination, islands. Raising
   this is also what would actually exercise the open question above about
   concurrent grader subprocesses.
-- **Real scoring.** Wire `evolution/normalization.py`'s tanh/z-score logic
-  into the grader instead of `evaluate()`'s raw weighted-sum score — needed
-  before results are comparable to the old coordinator's runs.
+- **Real scoring.** DONE in code (untested on node): grader now applies get_scan.toml
+  probes/weights + noop-baseline z-score/tanh (see grader.py docstring). Still to do:
+  run `python -m cache_evolution_grader.calibrate` on the node and sanity-check the stats.
 - **Old-coordinator retirement decision.** Whether `mem-evolve`'s
   `evolve.py` / `worker_server.py` / `start_workers.sh` fleet keeps running
   in parallel as a fallback, or gets archived once this pilot validates
