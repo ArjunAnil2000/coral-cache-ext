@@ -34,7 +34,7 @@ python3 -I grader/tests/test_scoring.py
 source ./litellm-creds.sh      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION
 ```
 `litellm_config.yaml` maps alias `claude-sonnet` to the Bedrock model id.
-**The model id has not been validated yet** (credentials have).
+The model id `bedrock/us.anthropic.claude-opus-5-5` was validated with a direct litellm call (2026-10-07); not yet through the CORAL gateway.
 
 ## 4. Pre-calibrate the noop baseline (~8 evals, ~6 min)
 
