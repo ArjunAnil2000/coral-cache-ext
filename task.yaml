@@ -118,7 +118,7 @@ grader:
 agents:
   count: 1
   runtime: claude_code
-  model: "claude-sonnet"   # alias in litellm_config.yaml (routes to Bedrock Opus 5.5)
+  model: "claude-opus-5-5"   # alias in litellm_config.yaml (routes to Bedrock Opus 5.5)
   gateway:
     enabled: true
     port: 4001
