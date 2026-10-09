@@ -145,11 +145,10 @@ def _raw_signed_score(
     results: Dict[str, ProbeResult],
     weights: Dict[str, float],
 ) -> float:
-    """Cheap raw weighted score: ignores units, used only when no
-    normalization state is available (calibration / standalone CLI).
+    """Cheap raw weighted score: ignores units; used only by the standalone CLI.
 
-    The CORAL grader never uses this; it scores from the raw probe values
-    (see grader/src/cache_evolution_grader/normalization.py).
+    The CORAL grader never uses this: its score is simply the raw value of the
+    throughput probe (ops/s), see grader/src/cache_evolution_grader/grader.py.
     """
     num, den = 0.0, 0.0
     for name, r in results.items():
@@ -195,8 +194,8 @@ def evaluate(
     `cache_ext/` source tree so relative paths in the script resolve.
 
     The returned `score` is a cheap raw weighted sum and SHOULD be ignored
-    by the grader, which z-scores the raw probe values against frozen
-    noop-baseline stats (grader/src/cache_evolution_grader/normalization.py).
+    by the grader, which reads the throughput probe's raw value (ops/s) from
+    `probes` and uses that as the score (grader/src/cache_evolution_grader/grader.py).
 
     If *split_phases* is True, the launch script is invoked twice:
       1. once with EVO_PHASE=warmup — probes do NOT wrap this. The launcher
@@ -458,8 +457,8 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument(
         "--weight", action="append", default=[], metavar="NAME=FLOAT",
         help="Override probe weight; repeat for multiple. Example: --weight wallclock=2.0. "
-             "The standalone CLI scores raw values — for normalized scoring across rounds, "
-             "use the CORAL grader (grader/src/cache_evolution_grader).",
+             "The standalone CLI prints a raw weighted sum; the CORAL grader's score is "
+             "simply the throughput probe's value in ops/s.",
     )
     return ap.parse_args()
 

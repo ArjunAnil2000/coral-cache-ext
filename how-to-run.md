@@ -61,13 +61,9 @@ python3 -I grader/tests/test_scoring.py
 ```bash
 coral validate .       # checks task.yaml, then runs the grader on seed/noop.c
 ```
-The first grade calibrates the `noop` baseline (8 evals, ~6 min) and caches stats at
-`~/.cache/cache_evolution_grader/get_scan_noop_stats.json`; the seed should then score ~0.
-To calibrate ahead of time (needs the grader's deps, e.g. the `coral` tool venv):
-```bash
-PYTHONPATH=grader/src ~/.local/share/uv/tools/coral/bin/python -m cache_evolution_grader.calibrate \
-  ssh_target=<user@host> ssh_key=~/.ssh/coral_eval_ed25519          # add --force to redo
-```
+This does one real eval (about 1 minute). The score you see is the absolute throughput in
+ops/s; the unmodified `noop` seed should land around 1210-1225 (repeat runs vary by 1-2%). There
+is no calibration step: the grader returns the measured throughput directly.
 
 ## 4. Run the agent
 
@@ -109,7 +105,5 @@ ssh <user@host> 'sudo bpftool struct_ops show; sudo fuser /run/evo_cache/eval.lo
   login first: `ssh <user@host> true`.
 - `eval node busy`: another eval holds the node's lock (`/run/evo_cache/eval.lock`).
 - `compile failed`: the message carries clang's stderr from the node.
-- Stats stale after changing probes, weights, baseline or node: automatic (fingerprint); or delete
-  the stats file.
 - A new node's first eval is slow and not representative: the benchmark DB is created on first use.
 - Gateway 400 "Invalid model name": add the requested name as an alias in `litellm_config.yaml`.

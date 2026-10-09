@@ -1,10 +1,14 @@
 # TODO
 
-## Status (2026-10-08)
+## Status (2026-10-09)
 
-All earlier runs, their results and the cached noop calibration were deleted on
-2026-10-08 to start from scratch. Nothing is running. The next run recalibrates the noop
-baseline on its first grade (8 evals, ~6 min) or via the calibrate CLI (see how-to-run.md).
+**Branch `absolute-throughput-score`:** the grader's score is the ABSOLUTE measured throughput
+in ops/s (no baseline calibration, z-score, `tanh` or weighting); the agent maximizes it. The
+other probes appear in the feedback only for diagnosis. The calibration step, stats cache,
+`normalization.py` and the calibrate CLI were removed on this branch.
+
+All earlier runs and their results were deleted on 2026-10-08 to start from scratch. Nothing
+is running.
 
 The repo is self-contained (`node/` + `third_party/cache_ext` submodule) and the SSH eval
 backend is deployed to the CloudLab node `c220g1-030815` at `/mydata/coral-cache-evolution`
@@ -19,12 +23,13 @@ first eval unrepresentative).
   CORAL's :4001 gateway; two bounded `coral start` runs completed with 0 grader errors.
 
 **Lessons from the earlier runs (operational, no results)**
-- Single-eval noise is large. The same code scored 0.92 and 0.52 on two evals (our grader
-  treats `--tune` and real evals identically), and the unchanged noop seed has scored -0.50.
-  Never rank policies from single evals; repeat (e.g. 8 evals each) before comparing.
-- The score is dominated by bytes-read / refault z-scores when those baselines are tight
-  (a ~5% drop is ~3 sigma and saturates tanh), so score rank and throughput rank can differ.
-  If throughput is the goal, report absolute throughput alongside the score.
+- Single-eval noise is large: identical code has measured 1257-1274 ops/s across evals, and
+  one re-submission of code that had measured ~1259 ops/s twice came out at 1165. The grader
+  treats `--tune` and real evals identically. Never rank policies from single evals; repeat
+  (e.g. 8 evals each) before comparing, and treat differences under ~1-2% as noise.
+- (Master-branch scoring only) a z-score/`tanh` score saturates near 1 once a policy is a few
+  sigma above a tight baseline, and bytes-read z-scores could outvote a throughput regression.
+  This branch avoids both by scoring raw throughput.
 - The agent reads the grader source by CORAL's design (`.claude/grader/` is a symlink to
   `grader/`). It also found earlier results elsewhere on the machine when the task
   description pointed at them; keep any reference material inside the worktree.
@@ -43,8 +48,9 @@ benchmark run on the node; `grader/tests` checks their format. Also learned: Clo
 
 ## Next steps
 
-1. Fresh bounded `coral start` (nothing queued yet); calibrate first so the first agent
-   eval is not slowed by it.
+1. Fresh bounded `coral start` on this branch (nothing queued yet); no calibration is needed.
+   Consider how to pick the final policy robustly, since the max of single noisy evals favors
+   luck (e.g. re-evaluate the top few candidates several times).
 2. Exercise `node/setup_node.sh` on a genuinely fresh node (it has only been
    syntax-checked; the existing node was provisioned before it was written).
 3. Decide how to handle the agent reading material outside its worktree. Agents run
@@ -76,5 +82,5 @@ benchmark run on the node; `grader/tests` checks their format. Also learned: Clo
   would be added under `seed/`.
 - **`agents.count` > 1**, islands.
 - **Multiple nodes:** one CORAL instance per node. A multi-node grader (a list of
-  `ssh_target`s with per-node calibration stats) is not implemented.
+  `ssh_target`s) is not implemented.
 - **Pinning the CORAL version** instead of installing from `main`.

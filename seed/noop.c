@@ -3,7 +3,7 @@
 // ============================================================================
 // EVOLVE-BLOCK-START
 // No-op: registers struct_ops but makes no eviction decisions; vanilla
-// kernel reclaim baseline, used for calibration.
+// kernel reclaim, the reference starting point.
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
@@ -45,7 +45,7 @@ struct cache_ext_ops evo_policy_ops = {
 // Baseline loader: parses the same args as a real policy and holds the cgroup
 // open until SIGINT, but never attaches struct_ops. The kernel runs its
 // default page-cache eviction policy on the cgroup, giving a clean "vanilla
-// Linux" reference point for normalization.
+// Linux" reference point.
 // EVOLVE-BLOCK-START
 #include <argp.h>
 #include <bpf/bpf.h>

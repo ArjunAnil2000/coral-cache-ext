@@ -12,7 +12,7 @@ Request:
     "runs":             1,                   # evals of the same compiled binary
     "benchmark":        "bench/get_scan/run_with_policy.sh",  # relative to this directory (node/)
     "probes":           [ {json_extract spec}, ... ],        # added to DEFAULT_PROBES
-    "weights":          {probe: weight},
+    "weights":          {probe: weight},         # ignored by the grader (kept for the CLI path)
     "eval_timeout":     180,
     "lock_wait":        600
   }
@@ -27,8 +27,8 @@ Serialization: struct_ops attach is global and exclusive and compile_policy()
 mutates cache_ext/policies/ in place, so compile + all `runs` evals happen
 under one flock.
 
-Raw scores from evaluate() are NOT used; the grader scores locally from the
-returned probe values.
+The `score` field of evaluate() is NOT used. The grader reads the throughput probe's
+raw value (ops/s) from the returned probes and uses it, unmodified, as the score.
 """
 
 import fcntl

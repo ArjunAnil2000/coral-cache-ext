@@ -1,10 +1,10 @@
-# CORAL task: dry plumbing run for cache_ext page-cache policy evolution.
+# CORAL task: evolve a cache_ext page-cache eviction policy for the get_scan workload.
 #
-# Goal of this task definition is NOT a real experiment — it's a minimal
-# end-to-end proof that one CORAL agent (running on THIS host) can edit the
-# seed policy, have the grader ssh to a CloudLab node that compiles it against
-# the real cache_ext toolchain, attaches it via BPF struct_ops, runs it under
-# the cgroup-isolated get_scan benchmark, and returns a score.
+# One CORAL agent (running on THIS host) edits the policy file; the grader ssh-es to a
+# CloudLab node that compiles it against the real cache_ext toolchain, attaches it via
+# BPF struct_ops, runs it under the cgroup-isolated get_scan benchmark, and returns the
+# measured throughput in ops/s as the score. The score is that absolute number -- no
+# baseline normalization, z-score or tanh squash -- and the agent's job is to maximize it.
 # Everything this task uses lives in this repo: node/ (what runs on the CloudLab
 # node), third_party/cache_ext (submodule), grader/, seed/.
 
@@ -21,13 +21,14 @@ task:
     issue point GETs against the hot-skewed distribution. The scan thread is
     the adversary: big sequential scans evict the hot GET working set from
     the cache. The benchmark runs in a memory-limited cgroup, so eviction
-    decisions matter.
+    decisions matter. The SCAN thread might/might not be pinned.
 
     ## Goal
-    Primary: maximize total throughput (ops/sec) -- equivalently minimize
-    bytes read from disk. Secondary: lower READ p99 latency without starving
-    SCAN throughput (a policy that merely delays scan-page eviction until
-    they are the only thing left just postpones the problem).
+    Maximize total throughput in operations per second (GETs plus SCANs, measured
+    by the benchmark over its 30-second measured phase). Your score is exactly this
+    number. Bytes read from disk, refaults and tail latency are not scored; they matter
+    only insofar as they move throughput (a policy that reads fewer bytes but spends
+    more CPU per operation can score lower).
 
     ## What you edit
     `noop.c` (one file, the repo root of your worktree). It has two sections,
@@ -50,14 +51,16 @@ task:
     You cannot compile or run anything locally (no cache_ext kernel here).
     Submit with `coral eval`. The grader ships your file to a dedicated
     benchmark machine, which compiles it, attaches it via BPF struct_ops, and
-    runs the benchmark (~1 minute). You get back a score in [-1, 1]: a
-    weighted mean of tanh(z-score vs. the no-op baseline) over throughput
-    (weight 2.0), bytes read (0.5) and memory pressure (0.25). 0 = same as the
-    no-op baseline; higher is better. The feedback lists each probe's raw
-    value and contribution. Throughput dominates: reading fewer bytes does NOT
-    compensate for lower throughput. Compile errors come back with clang's
-    output. Evaluations are serialized on one machine, so be deliberate with
-    submissions.
+    runs the benchmark (~1 minute). The score you get back is the ABSOLUTE
+    measured throughput in ops/sec (higher is better); it is not normalized,
+    z-scored or squashed. For reference, the unmodified no-op policy (kernel
+    default reclaim) measured about 1210-1225 ops/sec in earlier measurements.
+    The feedback also lists bytes read, refaults and wallclock for diagnosis, but
+    only throughput is the score. Repeated evaluations of identical code vary by
+    roughly 1-2% (occasionally more), so differences of a few ops/sec between
+    attempts are within noise; resubmit to confirm before trusting a small gain.
+    Compile errors come back with clang's output. Evaluations are serialized
+    on one machine, so be deliberate with submissions.
 
     ## Pitfalls (each costs an evaluation)
     - `is_folio_relevant(folio)` is true for every file under the watched
@@ -84,12 +87,11 @@ grader:
   entrypoint: "cache_evolution_grader.grader:Grader"
   setup:
     - "uv pip install -e ./grader"
-  # Worst case: local calibration lock (600) + first-grade calibration call
-  # (node lock 600 + compile 300 + 8*180 + slack) + one grade call (node lock
-  # 600 + compile 300 + 180 + slack). Pre-calibrate to avoid the middle term.
-  timeout: 4500
-  direction: maximize
-  # get_scan scoring: throughput directly scored (w=2.0), z-scored vs the noop baseline.
+  # One grade = one remote call: node lock wait (600) + compile (300) + one eval (180)
+  # + slack. No calibration step: the score is the raw throughput.
+  timeout: 1500
+  direction: maximize   # the score is throughput in ops/s; higher is better
+  # Score = absolute throughput (ops/s) from the benchmark's results.json. Nothing else is scored.
   args:
     policy_file: noop.c
     # SSH backend: set up once with node/install_remote.sh <ssh_target>.
@@ -97,17 +99,9 @@ grader:
     ssh_key: ~/.ssh/coral_eval_ed25519
     benchmark: bench/get_scan/run_with_policy.sh   # relative to node/ in the deployed repo
     eval_timeout: 180
-    calibrate_runs: 8
-    min_n: 2
-    squash: tanh
     lock_wait: 600
-    stats_path: ~/.cache/cache_evolution_grader/get_scan_noop_stats.json
-    required_probes: [throughput]
-    weights:
-      throughput: 2.0
-      cgroup_iostat: 0.5
-      cgroup_memstat: 0.25
-    probes:
+    required_probes: [throughput]   # a missing/invalid throughput fails the attempt instead of scoring 0
+    probes:                         # throughput is the score; the default probes (bytes read, refaults, wallclock) are diagnostics
       - type: json_extract
         name: throughput
         results_file: results.json

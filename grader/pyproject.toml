@@ -1,7 +1,7 @@
 [project]
 name = "cache-evolution-grader"
 version = "0.1.0"
-description = "CORAL grader for cache_ext policy evolution: grades over SSH on a CloudLab node and scores locally"
+description = "CORAL grader for cache_ext policy evolution: grades over SSH on a CloudLab node; the score is the measured throughput (ops/s)"
 requires-python = ">=3.11"
 dependencies = [
     "coral",
@@ -13,6 +13,3 @@ where = ["src"]
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools.package-data]
-cache_evolution_grader = ["baseline_noop.c"]

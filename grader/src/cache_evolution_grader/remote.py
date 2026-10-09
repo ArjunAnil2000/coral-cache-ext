@@ -45,7 +45,7 @@ def build_request(cfg: Dict[str, Any], policy_src: str, runs: int) -> Dict[str, 
         "runs": runs,
         "benchmark": cfg["benchmark"],
         "probes": cfg["probes"],
-        "weights": cfg["weights"],
+        "weights": {},   # unused: the grader scores from the raw throughput probe
         "eval_timeout": cfg["eval_timeout"],
         "lock_wait": cfg["lock_wait"],
     }

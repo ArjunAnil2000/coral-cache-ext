@@ -19,7 +19,7 @@ grader ssh-es to a **CloudLab node** that has the booted `6.6.8-cache-ext`
 kernel, `clang-14`, `bpftool` and the benchmark stack:
 
 ```
-dev host:  coral start -> agent edits noop.c -> grader (scoring, calibration stats)
+dev host:  coral start -> agent edits noop.c -> grader (score = measured throughput)
                                                    |  ssh (forced-command key)
 node:      node/eval_remote.py: flock -> compile_policy -> attach struct_ops
                                 -> get_scan benchmark -> raw probe values (JSON)
@@ -53,17 +53,14 @@ all evals of a request. CORAL itself grades serially by default
 │                                statement), grader args, 1 claude_code agent, gateway :4001
 ├── litellm_config.yaml          Bedrock model routing for CORAL's LiteLLM gateway
 ├── seed/
-│   ├── noop.c                   starting policy (no-op = the score baseline); the ONLY graded file
+│   ├── noop.c                   starting policy (no-op: kernel default reclaim); the ONLY graded file
 │   └── reference/               7 combined example policies (fifo, mru, s3fifo, sampling, get_scan,
 │                                mglru, lhd; same one-file format as noop.c) + cache_ext API headers
 ├── grader/                      CORAL grader package (runs on the dev host)
 │   ├── src/cache_evolution_grader/
-│   │   ├── grader.py            calibration + remote call + scoring
+│   │   ├── grader.py            one remote eval -> score = measured throughput (ops/s)
 │   │   ├── remote.py            ssh client (one retry on connection failure)
-│   │   ├── scoring.py           probe specs, weights, stats cache, feedback text
-│   │   ├── normalization.py     online z-score + tanh squash
-│   │   ├── calibrate.py         pre-calibration CLI
-│   │   └── baseline_noop.c      noop baseline used for calibration (not the agent's copy)
+│   │   └── scoring.py           throughput probe spec, required-probe check, feedback text
 │   └── tests/test_scoring.py    local tests (stubbed coral; real eval_remote.py vs stub evaluator)
 ├── node/                        everything that runs ON the CloudLab node
 │   ├── eval_remote.py           request/response server behind the forced command
@@ -79,21 +76,21 @@ all evals of a request. CORAL itself grades serially by default
 
 ## Scoring
 
-Per eval the node returns raw probe values; the grader scores them against
-frozen stats of the `noop` baseline (8 calibration runs, cached locally):
+**The score is the absolute throughput, in operations per second, that the benchmark
+measured while the submitted policy was attached. The agent maximizes it.** There is no
+baseline calibration, z-score, `tanh` squash or weighting: the grader returns the
+`throughput_ops_per_sec` number the benchmark wrote to `results.json`, unmodified.
 
-- probes: `throughput` (ops/s from the benchmark's `results.json`, maximize,
-  weight **2.0**), `cgroup_iostat` (bytes read, minimize, 0.5), `cgroup_memstat`
-  (refaults, minimize, 0.25); wallclock and policy counters are recorded, not scored
-- score = weighted mean of `tanh(±z)` per probe, in [-1, 1]; 0 = same as noop
-- throughput is scored directly because bytes read alone would reward a policy whose
-  throughput regressed
-- stats are frozen after calibration and fingerprinted on (probes, weights, ssh
-  target + benchmark, baseline source); a mismatch recalibrates automatically
+- one attempt = one remote eval (compile, attach, ~30 s measured phase after a warmup)
+- the other probes (bytes read, refaults, wallclock) are listed in the feedback text for
+  diagnosis but do not affect the score. A missing or non-positive throughput fails the
+  attempt instead of scoring 0
+- for scale, the unmodified `noop` policy measured about 1210-1225 ops/s on the current node
 
-Measurement noise is large: the noop baseline's throughput std is ~2%, and identical
-code has scored 0.92 and 0.52 on two single evals. Repeat evals (e.g. 8) before
-comparing policies, and look at absolute throughput, not just the score.
+Measurement noise is real: repeated evals of identical code differ by roughly 1-2%
+(occasionally much more: one re-submission of code that had measured about 1259 ops/s
+twice came out at 1165), so single evals can't distinguish small gains. Repeat evals
+(e.g. 8) before comparing policies.
 
 ## Design decisions
 

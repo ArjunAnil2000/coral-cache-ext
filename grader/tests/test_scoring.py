@@ -1,5 +1,5 @@
-"""Local tests: normalization/scoring math and grader control flow with a
-stubbed `coral` and fake evaluator. No BPF / CloudLab needed.
+"""Local tests: the grader (score = absolute throughput), the ssh client, the wire
+protocol of node/eval_remote.py and the seed-file format. No BPF / CloudLab needed.
 
 Run: python -I grader/tests/test_scoring.py   (from repo root)
 """
@@ -34,87 +34,35 @@ cg.TaskGrader = TaskGrader
 sys.modules.setdefault("coral", coral); sys.modules["coral.grader"] = cg
 
 from cache_evolution_grader import grader, remote, scoring  # noqa: E402
-from cache_evolution_grader.normalization import NormalizationState, extract_raw_values  # noqa: E402
 
-W = scoring.DEFAULT_WEIGHTS
-
-
-def probes(tp, io, mem):
+def probes(tp, io=3.0e8, mem=50000):
     return {
-        "throughput": {"value": tp, "direction": "maximize", "unit": "ops/s", "summary": "x"},
-        "cgroup_iostat": {"value": io, "direction": "minimize", "unit": "B", "summary": "x"},
-        "cgroup_memstat": {"value": mem, "direction": "minimize", "unit": "", "summary": "x"},
-        "wallclock": {"value": 30.0, "direction": "minimize", "unit": "s", "summary": "x"},
-        "policy_counters": {"value": 0, "direction": "record", "unit": "", "summary": "x"},
+        "throughput": {"value": tp, "direction": "maximize", "unit": "ops/s", "summary": f"throughput_ops_per_sec={tp:.2f} ops/s"},
+        "cgroup_iostat": {"value": io, "direction": "minimize", "unit": "B", "summary": f"rbytes={io:.3g}"},
+        "cgroup_memstat": {"value": mem, "direction": "minimize", "unit": "", "summary": f"refaults={mem}"},
+        "wallclock": {"value": 40.0, "direction": "minimize", "unit": "s", "summary": "wallclock: 40.00s"},
     }
 
 
-def baseline_state():
-    st = NormalizationState(min_n=2)
-    for tp, io, mem in [(1000, 1e9, 100), (1100, 1.1e9, 110), (900, 0.9e9, 90), (1000, 1e9, 100)]:
-        st.update(extract_raw_values(probes(tp, io, mem)))
-    return st
+def fake_result(tp, ok=True, pr=None):
+    return SimpleNamespace(ok=ok, error="" if ok else "bench failed", wallclock_sec=40.0,
+                           probes=pr if pr is not None else probes(tp), stderr_tail="",
+                           feedback_text=lambda: "fb")
 
 
-class MathTests(unittest.TestCase):
-    def test_baseline_mean_scores_zero_and_tanh_bounded(self):
-        st = baseline_state()
-        mean = st.probes["throughput"].mean
-        r = st.score(probes(mean, st.probes["cgroup_iostat"].mean, st.probes["cgroup_memstat"].mean), W)
-        self.assertAlmostEqual(r["score"], 0.0, places=9)
-        r = st.score(probes(1e9, 1, 1), W)
-        self.assertLessEqual(r["score"], 1.0)
-        self.assertGreater(r["score"], 0.99)
-        self.assertIn("wallclock", [] if "wallclock" in r["components"] else ["wallclock"])  # weight 0 -> unscored
-
-    def test_tanh_value(self):
-        st = baseline_state()
-        sd = st.probes["throughput"].stddev
-        r = st.score({"throughput": {"value": st.probes["throughput"].mean + sd, "direction": "maximize"}}, W)
-        self.assertAlmostEqual(r["score"], math.tanh(1.0), places=9)
-
-    def test_throughput_regression_with_iostat_win_loses_to_throughput_win(self):
-        st = baseline_state()
-        sd_io = st.probes["cgroup_iostat"].stddev
-        m = lambda n: st.probes[n].mean
-        sd_tp = st.probes["throughput"].stddev
-        regress = st.score(probes(m("throughput") - 1.5 * sd_tp, m("cgroup_iostat") - 2 * sd_io, m("cgroup_memstat")), W)
-        win = st.score(probes(m("throughput") + 1.0 * sd_tp, m("cgroup_iostat"), m("cgroup_memstat")), W)
-        self.assertLess(regress["score"], win["score"])
-        self.assertLess(regress["score"], 0)  # the 2026-08-13 motivating case
-
-    def test_zero_variance_probe_skipped(self):
-        st = NormalizationState(min_n=2)
-        for _ in range(3):
-            st.update({"throughput": 5.0})
-        r = st.score({"throughput": {"value": 6.0, "direction": "maximize"}}, W)
-        self.assertEqual(r["skipped"], ["throughput"]); self.assertEqual(r["score"], 0.0)
-
-    def test_stats_roundtrip_and_fingerprint(self):
-        st = baseline_state()
-        fp = scoring.fingerprint(scoring.DEFAULT_PROBE_SPECS, W, "b.sh", "src")
-        with tempfile.TemporaryDirectory() as d:
-            p = os.path.join(d, "s.json")
-            scoring.save_stats(p, fp, st, {"successes": 4})
-            got, meta = scoring.load_stats(p, fp)
-            self.assertAlmostEqual(got.probes["throughput"].mean, st.probes["throughput"].mean)
-            self.assertIsNone(scoring.load_stats(p, "other"))
-
-    def test_feedback_contains_components(self):
-        st = baseline_state()
-        pr = probes(800, 1e9, 100)
-        txt = scoring.format_feedback(st.score(pr, W), pr, 31.0, {"successes": 4, "attempted": 4})
-        for s in ("throughput", "cgroup_iostat", "z=", "contrib="):
-            self.assertIn(s, txt)
+class ScoringTests(unittest.TestCase):
+    def test_feedback_names_the_score_and_lists_probes(self):
+        txt = scoring.format_feedback(probes(1234.5), 40.0)
+        self.assertIn("score = throughput = 1234.50 ops/s", txt)
+        self.assertIn("<- SCORE", txt)
+        for name in ("cgroup_iostat", "cgroup_memstat", "wallclock"):
+            self.assertIn(name, txt)
+        self.assertNotIn("tanh", txt); self.assertNotIn("z=", txt)
 
     def test_invalid_required_probe(self):
         pr = {"throughput": {"summary": "(missing results file /x)"}}
         self.assertTrue(scoring.invalid_required_probes(pr, ["throughput"]))
-
-
-def fake_result(vals, ok=True):
-    return SimpleNamespace(ok=ok, error="" if ok else "bench failed", wallclock_sec=30.0, probes=probes(*vals),
-                           stderr_tail="", feedback_text=lambda: "fb")
+        self.assertFalse(scoring.invalid_required_probes(probes(1000.0), ["throughput"]))
 
 
 class FlowTests(unittest.TestCase):
@@ -123,14 +71,11 @@ class FlowTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         (Path(self.tmp) / "noop.c").write_text("// policy")
-        self.args = {
-            "ssh_target": "u@node", "stats_path": str(Path(self.tmp) / "stats.json"),
-            "calibrate_runs": 4, "lock_wait": 2,
-        }
-        self.base_vals = [(1000, 1e9, 100), (1100, 1.1e9, 110), (900, 0.9e9, 90), (1000, 1e9, 100)]
-        self.next_policy = (1000, 1e9, 100)
+        self.args = {"ssh_target": "u@node", "lock_wait": 2}
+        self.throughput = 1234.5
         self.compile_ok = True
         self.raise_exc = None
+        self.probes_override = None
         self.calls = []
         self._orig_run_remote = remote.run_remote
         remote.run_remote = self.fake_remote
@@ -145,31 +90,41 @@ class FlowTests(unittest.TestCase):
         comp = SimpleNamespace(ok=self.compile_ok, error="boom", stderr_tail="clang: error: x")
         if not self.compile_ok:
             return comp, []
-        if src == "// policy":
-            return comp, [fake_result(self.next_policy)]
-        return comp, [fake_result(v) for v in self.base_vals[:runs]]
+        return comp, [fake_result(self.throughput, pr=self.probes_override)]
 
     def grade(self):
         return grader.Grader(args=self.args, codebase_path=self.tmp).evaluate()
 
-    def test_calibrates_once_then_scores(self):
-        r1 = self.grade()
-        self.assertEqual(r1[0], "score")
-        self.assertEqual([c[1] for c in self.calls], [4, 1])  # one calibration call (4 runs), one eval
-        self.assertAlmostEqual(r1[1], 0.0, places=6)
-        self.next_policy = (700, 0.5e9, 100)  # throughput regression, iostat win
-        r2 = self.grade()
-        self.assertEqual(len(self.calls), 3)  # no recalibration
-        self.assertLess(r2[1], 0)
-        self.assertIn("throughput", r2[2])
+    def test_score_is_the_absolute_throughput(self):
+        r = self.grade()
+        self.assertEqual(r[0], "score")
+        self.assertEqual(r[1], 1234.5)               # unmodified: not normalized, not squashed
+        self.assertIn("1234.50 ops/s", r[2])
+        self.assertEqual(self.calls, [("// policy", 1)])   # exactly one remote eval; no calibration
+
+    def test_score_exceeds_one_and_tracks_throughput_exactly(self):
+        for tp in (900.0, 1211.6, 1277.7, 1500.0):
+            self.throughput = tp
+            self.assertEqual(self.grade()[1], tp)
+
+    def test_other_probes_do_not_change_the_score(self):
+        self.probes_override = probes(1250.0, io=1.0e6, mem=1)      # tiny I/O: must not help
+        a = self.grade()[1]
+        self.probes_override = probes(1250.0, io=9.9e9, mem=10**9)  # huge I/O: must not hurt
+        self.assertEqual(a, self.grade()[1])
+
+    def test_missing_or_nonpositive_throughput_fails_not_scores_zero(self):
+        self.probes_override = probes(0.0)
+        r = self.grade(); self.assertEqual(r[0], "fail"); self.assertIn("no usable result", r[1])
+        self.probes_override = dict(probes(1000.0)); self.probes_override["throughput"] = {"value": 0.0, "summary": "(missing results file)"}
+        r = self.grade(); self.assertEqual(r[0], "fail"); self.assertIn("required probe", r[1])
 
     def test_compile_failure_includes_compiler_output(self):
-        self.grade(); self.compile_ok = False
+        self.compile_ok = False
         r = self.grade()
         self.assertEqual(r[0], "fail"); self.assertIn("clang: error", r[1])
 
     def test_infrastructure_errors_are_labelled(self):
-        self.grade()
         self.raise_exc = remote.RemoteError("ssh down")
         r = self.grade(); self.assertEqual(r[0], "fail"); self.assertIn("not your policy", r[1])
         self.raise_exc = remote.RemoteBusy("lock")
