@@ -33,6 +33,14 @@ first eval unrepresentative).
   built-in retries ride it out.
 - `run.session: local` means no tmux; the agent is a child process of the manager.
 
+**Seeds (2026-10-09):** the reference policies in `seed/reference/` are now one combined
+file each (fifo, mru, s3fifo, sampling, get_scan, mglru, lhd), same format as `noop.c`, each with a
+description under the banner. Loaders were fixed to wait for SIGINT/SIGTERM (the originals blocked
+on `getchar()`, which exits immediately under the harness), to accept `-w/-s/-c`, and
+`get_scan` reuses the harness-pinned `scan_pids` map. All seven compile, attach and complete a
+benchmark run on the node; `grader/tests` checks their format. Also learned: CloudLab rewrites
+`~/.ssh/authorized_keys` (dropped our key); the installer now uses `authorized_keys2`.
+
 ## Next steps
 
 1. Fresh bounded `coral start` (nothing queued yet); calibrate first so the first agent

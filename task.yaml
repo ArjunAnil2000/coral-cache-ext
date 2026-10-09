@@ -38,11 +38,13 @@ task:
     `SECTION: USERSPACE LOADER`. Keep both sections and the marker comments:
     the grader splits the file on them. The starting policy is a no-op that
     leaves eviction to the kernel's default reclaim (the score baseline).
-    Reference implementations to learn the cache_ext API from are in
-    `reference/` inside your worktree (cache_ext_lib.bpf.h, cache_ext_s3fifo.bpf.c,
-    cache_ext_sampling.bpf.c, cache_ext_get_scan.bpf.c, ...; `*.bpf.c` is the kernel
-    side, `*.c` its userspace loader). They are not graded. Do not go looking for
-    other material outside your worktree.
+    Complete example policies are in `reference/` inside your worktree, one file each, in
+    exactly the same format as `noop.c`: fifo.c, mru.c, s3fifo.c, sampling.c, get_scan.c,
+    mglru.c, lhd.c. Each starts with a short description of what the policy does, and each
+    works as-is, so you can copy one over `noop.c`, submit it unchanged to see its score,
+    or use it as the starting point for your own changes. `reference/cache_ext_lib.bpf.h`
+    documents the helper API. These files are not graded. Do not go looking for other
+    material outside your worktree.
 
     ## How you are graded
     You cannot compile or run anything locally (no cache_ext kernel here).

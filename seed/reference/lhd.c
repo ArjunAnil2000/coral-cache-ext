@@ -1,3 +1,11 @@
+// ============================================================================
+// SECTION: BPF KERNEL CODE
+// ============================================================================
+// EVOLVE-BLOCK-START
+// LHD (Least Hit Density): ranks folios by expected hits per unit of cache space-time,
+// using per-age hit/eviction statistics, and evicts the lowest density first. Class
+// statistics are recomputed periodically: a BPF event wakes the userspace loader through a
+// ring buffer and it runs the BPF 'reconfigure' program.
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
@@ -5,7 +13,28 @@
 
 #include "cache_ext_lib.bpf.h"
 #include "dir_watcher.bpf.h"
-#include "cache_ext_lhd.bpf.h"
+#ifndef _CACHE_EXT_LHD_BPF_H
+#define _CACHE_EXT_LHD_BPF_H
+
+#define HIT_AGE_CLASSES 16
+#define APP_CLASSES 16
+#define NUM_CLASSES ((HIT_AGE_CLASSES) * (APP_CLASSES))  // Must be power of two for masking
+#define NUM_CLASSES_MASK (NUM_CLASSES - 1)
+#define INITIAL_AGE_COARSENING_SHIFT 10
+#define REQS_PER_RECONFIG (1 << 20)
+#define MAX_AGE (1 << 14)  // Must be power of two for masking
+#define MAX_AGE_MASK (MAX_AGE - 1)
+#define DEFAULT_APP_ID 1  // TODO: can prob delete app stuff
+#define RECENTLY_ADMITTED_SIZE 8
+
+#define HIT_SCALING_FACTOR (1 << 20)
+#define HIT_DENSITY_SCALING_FACTOR (1 << 20)
+#define NUM_OBJECTS_SCALING_FACTOR (1 << 20)
+
+#define TOTAL_EVENTS_THRESH (HIT_SCALING_FACTOR / 100000)
+#define AGE_COARSENING_ERROR_TOLERANCE 100 // Inverse of value in libcachesim
+
+#endif /* _CACHE_EXT_LHD_BPF_H */
 
 char _license[] SEC("license") = "GPL";
 
@@ -277,7 +306,7 @@ int reconfigure(void) {
 	return 0;
 }
 
-s32 BPF_STRUCT_OPS_SLEEPABLE(lhd_init, struct mem_cgroup *memcg) {
+s32 BPF_STRUCT_OPS_SLEEPABLE(evo_policy_init, struct mem_cgroup *memcg) {
 	uint32_t i;
 
 	lhd_list = bpf_cache_ext_ds_registry_new_list(memcg);
@@ -320,7 +349,7 @@ static s64 bpf_lhd_score_fn(struct cache_ext_list_node *a) {
 	return get_hit_density(data);
 }
 
-void BPF_STRUCT_OPS(lhd_evict_folios, struct cache_ext_eviction_ctx *eviction_ctx,
+void BPF_STRUCT_OPS(evo_policy_evict_folios, struct cache_ext_eviction_ctx *eviction_ctx,
 	       struct mem_cgroup *memcg)
 {
 	struct sampling_options opts = {
@@ -367,7 +396,7 @@ void BPF_STRUCT_OPS(lhd_evict_folios, struct cache_ext_eviction_ctx *eviction_ct
 	}*/
 }
 
-void BPF_STRUCT_OPS(lhd_folio_accessed, struct folio *folio) {
+void BPF_STRUCT_OPS(evo_policy_folio_accessed, struct folio *folio) {
 	if (!is_folio_relevant(folio))
 		return;
 
@@ -405,7 +434,7 @@ void BPF_STRUCT_OPS(lhd_folio_accessed, struct folio *folio) {
 	}
 }
 
-void BPF_STRUCT_OPS(lhd_folio_evicted, struct folio *folio) {
+void BPF_STRUCT_OPS(evo_policy_folio_evicted, struct folio *folio) {
 	u64 key = (u64)folio;
 	u64 age, hit_density, *evictions;
 	struct lhd_class *cls;
@@ -443,7 +472,7 @@ void BPF_STRUCT_OPS(lhd_folio_evicted, struct folio *folio) {
 		bpf_printk("cache_ext: evicted: Failed to delete metadata\n");
 }
 
-void BPF_STRUCT_OPS(lhd_folio_added, struct folio *folio) {
+void BPF_STRUCT_OPS(evo_policy_folio_added, struct folio *folio) {
 	if (!is_folio_relevant(folio))
 		return;
 
@@ -493,10 +522,265 @@ void BPF_STRUCT_OPS(lhd_folio_added, struct folio *folio) {
 }
 
 SEC(".struct_ops.link")
-struct cache_ext_ops lhd_ops = {
-	.init = (void *)lhd_init,
-	.evict_folios = (void *)lhd_evict_folios,
-	.folio_accessed = (void *)lhd_folio_accessed,
-	.folio_evicted = (void *)lhd_folio_evicted,
-	.folio_added = (void *)lhd_folio_added,
+struct cache_ext_ops evo_policy_ops = {
+	.init = (void *)evo_policy_init,
+	.evict_folios = (void *)evo_policy_evict_folios,
+	.folio_accessed = (void *)evo_policy_folio_accessed,
+	.folio_evicted = (void *)evo_policy_folio_evicted,
+	.folio_added = (void *)evo_policy_folio_added,
 };
+// EVOLVE-BLOCK-END
+
+// ============================================================================
+// SECTION: USERSPACE LOADER
+// ============================================================================
+// Loader for the LHD policy: parses -w/-s/-c like every policy in this repo,
+// attaches the struct_ops to the cgroup and waits for SIGINT/SIGTERM.
+// EVOLVE-BLOCK-START
+#include <argp.h>
+#include <errno.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <bpf/bpf.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include "dir_watcher.h"
+#ifndef _CACHE_EXT_LHD_BPF_H
+#define _CACHE_EXT_LHD_BPF_H
+
+#define HIT_AGE_CLASSES 16
+#define APP_CLASSES 16
+#define NUM_CLASSES ((HIT_AGE_CLASSES) * (APP_CLASSES))  // Must be power of two for masking
+#define NUM_CLASSES_MASK (NUM_CLASSES - 1)
+#define INITIAL_AGE_COARSENING_SHIFT 10
+#define REQS_PER_RECONFIG (1 << 20)
+#define MAX_AGE (1 << 14)  // Must be power of two for masking
+#define MAX_AGE_MASK (MAX_AGE - 1)
+#define DEFAULT_APP_ID 1  // TODO: can prob delete app stuff
+#define RECENTLY_ADMITTED_SIZE 8
+
+#define HIT_SCALING_FACTOR (1 << 20)
+#define HIT_DENSITY_SCALING_FACTOR (1 << 20)
+#define NUM_OBJECTS_SCALING_FACTOR (1 << 20)
+
+#define TOTAL_EVENTS_THRESH (HIT_SCALING_FACTOR / 100000)
+#define AGE_COARSENING_ERROR_TOLERANCE 100 // Inverse of value in libcachesim
+
+#endif /* _CACHE_EXT_LHD_BPF_H */
+#include "evo_policy.skel.h"
+
+char *USAGE = "Usage: ./evo_policy --watch_dir <dir> --cgroup_path <path>\n";
+struct cmdline_args {
+	char *watch_dir;
+	char *cgroup_path;
+	uint64_t cgroup_size;	/* accepted for harness compatibility */
+};
+
+static struct argp_option options[] = {
+	{ "watch_dir", 'w', "DIR", 0, "Directory to watch" },
+	{ "cgroup_path", 'c', "PATH", 0, "Path to cgroup (e.g., /sys/fs/cgroup/cache_ext_test)" },
+	{ "cgroup_size", 's', "SIZE", 0,
+	  "Size of the cgroup in bytes (accepted for harness compatibility)" },
+					{ 0 },
+};
+
+static long num_reconfigurations;
+
+static volatile sig_atomic_t exiting;
+
+static void sig_handler(int signo) {
+	exiting = 1;
+}
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
+{
+	struct cmdline_args *args = state->input;
+	switch (key) {
+	case 'w':
+		args->watch_dir = arg;
+		break;
+	case 'c':
+		args->cgroup_path = arg;
+		break;
+	case 's':
+		errno = 0;
+		args->cgroup_size = strtoull(arg, NULL, 10);
+		if (errno)
+			args->cgroup_size = 0;
+		break;
+	default:
+		return ARGP_ERR_UNKNOWN;
+	}
+	return 0;
+}
+
+static int parse_args(int argc, char **argv, struct cmdline_args *args) {
+	struct argp argp = { options, parse_opt, 0, 0 };
+	argp_parse(&argp, argc, argv, 0, 0, args);
+
+	if (args->watch_dir == NULL) {
+		fprintf(stderr, "Missing required argument: watch_dir\n");
+		return 1;
+	}
+
+	if (args->cgroup_path == NULL) {
+		fprintf(stderr, "Missing required argument: cgroup_path\n");
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
+ * Validate watch_dir
+ *
+ * watch_dir_full_path must be able to hold PATH_MAX bytes.
+ */
+static int validate_watch_dir(const char *watch_dir, char *watch_dir_full_path) {
+	// Does watch_dir exist?
+	if (access(watch_dir, F_OK) == -1) {
+		fprintf(stderr, "Directory does not exist: %s\n", watch_dir);
+		return 1;
+	}
+
+	// Get full path of watch_dir
+	if (realpath(watch_dir, watch_dir_full_path) == NULL) {
+		perror("realpath");
+		return 1;
+	}
+
+	// BPF policy restriction
+	if (strlen(watch_dir_full_path) > 128) {
+		fprintf(stderr, "watch_dir path too long\n");
+		return 1;
+	}
+
+	return 0;
+}
+
+static int handle_event(void *ctx, void *data, size_t data_sz) {
+	// Run BPF reconfigure program using BPF_PROG_RUN
+	int ret = 0;
+	int reconfigure_prog_fd = *(int *)ctx;
+
+	struct bpf_test_run_opts opts = {
+		.sz = sizeof(opts),
+	};
+	
+	++num_reconfigurations;
+
+	ret = bpf_prog_test_run_opts(reconfigure_prog_fd, &opts);
+	if (ret)
+		perror("Failed to run reconfigure program");
+
+	return ret;
+}
+
+int main(int argc, char **argv) {
+	struct cmdline_args args = { 0 };
+	struct evo_policy_bpf *skel = NULL;
+	struct bpf_link *link = NULL;
+	struct ring_buffer *events = NULL;
+	struct sigaction sa;
+	char watch_dir_path[PATH_MAX];
+	int reconfigure_prog_fd;
+	int cgroup_fd = -1;
+	int ret = 1;
+
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+
+	if (parse_args(argc, argv, &args))
+		return 1;
+
+	memset(&sa, 0, sizeof(sa));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = sig_handler;
+
+	// Install signal handler
+	if (sigaction(SIGINT, &sa, NULL) || sigaction(SIGTERM, &sa, NULL)) {
+		perror("Failed to set up signal handling");
+		return 1;
+	}
+
+	if (validate_watch_dir(args.watch_dir, watch_dir_path))
+		return 1;
+
+	cgroup_fd = open(args.cgroup_path, O_RDONLY);
+	if (cgroup_fd < 0) {
+		fprintf(stderr, "Failed to open cgroup path %s: %s\n",
+			args.cgroup_path, strerror(errno));
+		return 1;
+	}
+
+	skel = evo_policy_bpf__open();
+	if (!skel) {
+		perror("Failed to open BPF skeleton");
+		goto cleanup;
+	}
+
+	watch_dir_path_len_map(skel) = strlen(watch_dir_path);
+	strcpy(watch_dir_path_map(skel), watch_dir_path);
+
+	if (evo_policy_bpf__load(skel)) {
+		perror("Failed to load BPF skeleton");
+		goto cleanup;
+	}
+
+	if (initialize_watch_dir_map(watch_dir_path, bpf_map__fd(inode_watchlist_map(skel)), false)) {
+		perror("Failed to initialize watch_dir map");
+		goto cleanup;
+	}
+
+	// Get fd of reconfigure program
+	reconfigure_prog_fd = bpf_program__fd(skel->progs.reconfigure);
+
+	events = ring_buffer__new(bpf_map__fd(skel->maps.events), handle_event, &reconfigure_prog_fd, NULL);
+	if (!events) {
+		perror("Failed to create ring buffer");
+		goto cleanup;
+	}
+
+	link = bpf_map__attach_cache_ext_ops(skel->maps.evo_policy_ops, cgroup_fd);
+	if (link == NULL) {
+		perror("Failed to attach cache_ext_ops to cgroup");
+		goto cleanup;
+	}
+
+	// This is necessary for the dir_watcher functionality
+	if (evo_policy_bpf__attach(skel)) {
+		perror("Failed to attach BPF skeleton");
+		goto cleanup;
+	}
+
+	while (!exiting) {
+		ret = ring_buffer__poll(events, -1); // infinite timeout
+		
+		if (ret == -EINTR) {
+			ret = 0;
+			break;
+		} else if (ret < 0) {
+			fprintf(stderr, "error polling ring buffer: %d\n", ret);
+			ret = 1;
+			goto cleanup;
+		} else {
+			ret = 0;
+		}
+	}
+
+	printf("Number of reconfigurations: %ld\n", num_reconfigurations);
+
+cleanup:
+	close(cgroup_fd);
+	ring_buffer__free(events);
+	bpf_link__destroy(link);
+	evo_policy_bpf__destroy(skel);
+	return ret;
+}
+// EVOLVE-BLOCK-END

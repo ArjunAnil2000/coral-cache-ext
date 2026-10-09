@@ -46,7 +46,9 @@ ssh <user@host> /mydata/coral-cache-evolution/node/setup_node.sh --post-reboot
 ssh <user@host> /mydata/coral-cache-evolution/node/bench/get_scan/setup.sh setup   # once per node: builds the benchmark
 ```
 This generates `~/.ssh/coral_eval_ed25519`, rsyncs the repo to the node, and installs
-the key as a forced-command key. Set `ssh_target` / `ssh_key` in `task.yaml`.
+the key as a forced-command key in the node's `~/.ssh/authorized_keys2` (CloudLab regenerates
+`authorized_keys` from the portal and silently dropped our entry once; `sshd` also honours
+`authorized_keys2`, which nothing rewrites). Set `ssh_target` / `ssh_key` in `task.yaml`.
 
 ## 2. Local tests (no node needed)
 
@@ -102,7 +104,9 @@ ssh <user@host> 'sudo bpftool struct_ops show; sudo fuser /run/evo_cache/eval.lo
 
 ## Troubleshooting
 
-- `grader infrastructure error ... ssh`: node unreachable or the key isn't installed; rerun step 1.
+- `grader infrastructure error ... ssh` / `Permission denied (publickey)`: node unreachable or the
+  restricted key isn't installed (e.g. the node was replaced); rerun step 1. Check with your normal
+  login first: `ssh <user@host> true`.
 - `eval node busy`: another eval holds the node's lock (`/run/evo_cache/eval.lock`).
 - `compile failed`: the message carries clang's stderr from the node.
 - Stats stale after changing probes, weights, baseline or node: automatic (fingerprint); or delete

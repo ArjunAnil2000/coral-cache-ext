@@ -274,5 +274,47 @@ class RemoteProtocolTests(unittest.TestCase):
         self.assertEqual(r["status"], "busy"); fd.close()
 
 
+class SeedFormatTests(unittest.TestCase):
+    """Every seed (noop + seed/reference/*.c) must be a complete single-file policy the
+    node's pipeline can split and compile. (Compiling/running them is checked on the node.)"""
+
+    ROOT = Path(__file__).resolve().parents[2]
+
+    def seeds(self):
+        files = [self.ROOT / "seed" / "noop.c"] + sorted((self.ROOT / "seed" / "reference").glob("*.c"))
+        self.assertGreaterEqual(len(files), 8)
+        return files
+
+    def test_all_seeds_split_and_are_self_consistent(self):
+        sys.path.insert(0, str(self.ROOT / "node"))
+        from targets.code_splitter import split_sections
+        for f in self.seeds():
+            src = f.read_text()
+            with self.subTest(seed=f.name):
+                bpf, loader = split_sections(src)
+                self.assertTrue(bpf.strip() and loader.strip(), "splitter found no sections")
+                self.assertEqual(src.count("// EVOLVE-BLOCK-START"), 2)
+                self.assertEqual(src.count("// EVOLVE-BLOCK-END"), 2)
+                self.assertIn("evo_policy_ops", bpf)
+                self.assertIn("struct cache_ext_ops", bpf)
+                self.assertIn('#include "evo_policy.skel.h"', loader)
+                if f.name != "noop.c":                        # the noop baseline deliberately never attaches
+                    self.assertIn("evo_policy_bpf__", loader)
+                self.assertNotIn("getchar", loader)           # harness runs the loader with no stdin
+                self.assertIn("SIGTERM", loader)              # evaluator stops it with INT then TERM
+                for opt in ("'w'", "'s'", "'c'"):             # harness always passes -w -s -c
+                    self.assertIn(opt, loader)
+                self.assertNotIn("cache_ext_" + f.stem + "_bpf", src)
+
+    def test_description_under_the_kernel_banner(self):
+        for f in self.seeds():
+            lines = f.read_text().splitlines()
+            with self.subTest(seed=f.name):
+                i = lines.index("// SECTION: BPF KERNEL CODE")
+                j = lines.index("// EVOLVE-BLOCK-START", i)
+                desc = lines[j + 1]
+                self.assertTrue(desc.startswith("// ") and len(desc) > 20, f"no description: {desc!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

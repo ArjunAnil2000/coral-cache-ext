@@ -54,7 +54,8 @@ all evals of a request. CORAL itself grades serially by default
 ├── litellm_config.yaml          Bedrock model routing for CORAL's LiteLLM gateway
 ├── seed/
 │   ├── noop.c                   starting policy (no-op = the score baseline); the ONLY graded file
-│   └── reference/               cache_ext headers + reference policies for the agent to read
+│   └── reference/               7 combined example policies (fifo, mru, s3fifo, sampling, get_scan,
+│                                mglru, lhd; same one-file format as noop.c) + cache_ext API headers
 ├── grader/                      CORAL grader package (runs on the dev host)
 │   ├── src/cache_evolution_grader/
 │   │   ├── grader.py            calibration + remote call + scoring
@@ -73,7 +74,7 @@ all evals of a request. CORAL itself grades serially by default
 │   ├── policy_lib/evo_dump.h    header staged into policies/ at compile time
 │   └── bench/get_scan/          run_with_policy.sh (the benchmark), setup.sh (its build)
 ├── third_party/cache_ext/       submodule (pinned): policy Makefile + headers, nested vulcan_bpf
-└── scripts/sync_reference.sh    regenerates seed/reference/ from the submodule
+└── scripts/sync_reference.sh    refreshes the cache_ext API headers in seed/reference/ from the submodule
 ```
 
 ## Scoring

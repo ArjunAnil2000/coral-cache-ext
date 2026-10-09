@@ -5,7 +5,7 @@
 #   1. generates a dedicated passphrase-less key (default ~/.ssh/coral_eval_ed25519)
 #   2. rsyncs this repo (node/, third_party/ -- not results/, .git, .coral) to the
 #      node at node_root (default /mydata/coral-cache-evolution)
-#   3. installs the public key in the node's ~/.ssh/authorized_keys as a
+#   3. installs the public key in the node's ~/.ssh/authorized_keys2 as a
 #      FORCED-COMMAND key: it can only run node/eval_remote.py (as root via
 #      sudo -n), with no pty/forwarding (`restrict`). Agents that read this
 #      key (they run on this host) therefore get no shell on the node. An
@@ -37,9 +37,15 @@ rsync -a --delete \
   "$REPO/" "$TARGET:$NODE_ROOT/"
 
 LINE="command=\"$FORCED\",restrict $PUB"
-ssh "$TARGET" "mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && \
-  grep -vF '$BLOB' ~/.ssh/authorized_keys > ~/.ssh/authorized_keys.new || true; \
-  printf '%s\n' '$LINE' >> ~/.ssh/authorized_keys.new && mv ~/.ssh/authorized_keys.new ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+# Install into ~/.ssh/authorized_keys2, NOT authorized_keys: CloudLab regenerates
+# authorized_keys from the portal (observed: it silently dropped our entry), while sshd
+# also honours authorized_keys2 (AuthorizedKeysFile default) and nothing rewrites that.
+# Any stale entry for this key in authorized_keys is removed.
+ssh "$TARGET" "mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys ~/.ssh/authorized_keys2 && \
+  chmod 600 ~/.ssh/authorized_keys ~/.ssh/authorized_keys2 && \
+  { grep -vF '$BLOB' ~/.ssh/authorized_keys > ~/.ssh/authorized_keys.tmp || true; } && cat ~/.ssh/authorized_keys.tmp > ~/.ssh/authorized_keys && rm -f ~/.ssh/authorized_keys.tmp && \
+  { grep -vF '$BLOB' ~/.ssh/authorized_keys2 > ~/.ssh/authorized_keys2.tmp || true; } && printf '%s\n' '$LINE' >> ~/.ssh/authorized_keys2.tmp && \
+  mv ~/.ssh/authorized_keys2.tmp ~/.ssh/authorized_keys2 && chmod 600 ~/.ssh/authorized_keys2"
 
 echo "deployed to $TARGET:$NODE_ROOT"
 echo "grader.args: ssh_target=$TARGET ssh_key=$KEY remote_command=<forced; see task.yaml>"
