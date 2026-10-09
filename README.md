@@ -1,5 +1,8 @@
 # coral-cache-evolution
 
+> **Branch `20-evol-one-seed`:** single-seed experiment. S3-FIFO is the only starting policy
+> (`seed/noop.c`); no other example policies are provided; 20-attempt bounded run.
+
 A [CORAL](https://github.com/Human-Agent-Society/CORAL) task for evolving Linux
 page-cache eviction policies, written as eBPF `cache_ext` struct_ops programs,
 against a GET-SCAN LevelDB workload. An autonomous Claude Code agent edits one
@@ -19,7 +22,7 @@ grader ssh-es to a **CloudLab node** that has the booted `6.6.8-cache-ext`
 kernel, `clang-14`, `bpftool` and the benchmark stack:
 
 ```
-dev host:  coral start -> agent edits noop.c -> grader (score = measured throughput)
+dev host:  coral start -> agent edits noop.c (S3-FIFO seed) -> grader (score = measured throughput)
                                                    |  ssh (forced-command key)
 node:      node/eval_remote.py: flock -> compile_policy -> attach struct_ops
                                 -> get_scan benchmark -> raw probe values (JSON)
@@ -53,9 +56,9 @@ all evals of a request. CORAL itself grades serially by default
 │                                statement), grader args, 1 claude_code agent, gateway :4001
 ├── litellm_config.yaml          Bedrock model routing for CORAL's LiteLLM gateway
 ├── seed/
-│   ├── noop.c                   starting policy (no-op: kernel default reclaim); the ONLY graded file
-│   └── reference/               7 combined example policies (fifo, mru, s3fifo, sampling, get_scan,
-│                                mglru, lhd; same one-file format as noop.c) + cache_ext API headers
+│   ├── noop.c                   the single seed: S3-FIFO (filename kept for the grader's policy_file);
+│   │                            the ONLY graded file
+│   └── reference/               cache_ext API headers only (no example policies)
 ├── grader/                      CORAL grader package (runs on the dev host)
 │   ├── src/cache_evolution_grader/
 │   │   ├── grader.py            one remote eval -> score = measured throughput (ops/s)
@@ -85,7 +88,7 @@ baseline calibration, z-score, `tanh` squash or weighting: the grader returns th
 - the other probes (bytes read, refaults, wallclock) are listed in the feedback text for
   diagnosis but do not affect the score. A missing or non-positive throughput fails the
   attempt instead of scoring 0
-- for scale, the unmodified `noop` policy measured about 1210-1225 ops/s on the current node
+- the unmodified S3-FIFO seed has no recorded baseline on this branch yet; the old no-op policy measured about 1210-1225 ops/s on the node
 
 Measurement noise is real: repeated evals of identical code differ by roughly 1-2%
 (occasionally much more: one re-submission of code that had measured about 1259 ops/s

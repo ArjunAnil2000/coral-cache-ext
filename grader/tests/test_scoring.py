@@ -230,15 +230,13 @@ class RemoteProtocolTests(unittest.TestCase):
 
 
 class SeedFormatTests(unittest.TestCase):
-    """Every seed (noop + seed/reference/*.c) must be a complete single-file policy the
+    """The seed (seed/noop.c, S3-FIFO) must be a complete single-file policy the
     node's pipeline can split and compile. (Compiling/running them is checked on the node.)"""
 
     ROOT = Path(__file__).resolve().parents[2]
 
     def seeds(self):
-        files = [self.ROOT / "seed" / "noop.c"] + sorted((self.ROOT / "seed" / "reference").glob("*.c"))
-        self.assertGreaterEqual(len(files), 8)
-        return files
+        return [self.ROOT / "seed" / "noop.c"]
 
     def test_all_seeds_split_and_are_self_consistent(self):
         sys.path.insert(0, str(self.ROOT / "node"))
@@ -253,8 +251,7 @@ class SeedFormatTests(unittest.TestCase):
                 self.assertIn("evo_policy_ops", bpf)
                 self.assertIn("struct cache_ext_ops", bpf)
                 self.assertIn('#include "evo_policy.skel.h"', loader)
-                if f.name != "noop.c":                        # the noop baseline deliberately never attaches
-                    self.assertIn("evo_policy_bpf__", loader)
+                self.assertIn("evo_policy_bpf__", loader)
                 self.assertNotIn("getchar", loader)           # harness runs the loader with no stdin
                 self.assertIn("SIGTERM", loader)              # evaluator stops it with INT then TERM
                 for opt in ("'w'", "'s'", "'c'"):             # harness always passes -w -s -c

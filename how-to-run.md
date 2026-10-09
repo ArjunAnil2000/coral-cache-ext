@@ -59,10 +59,10 @@ python3 -I grader/tests/test_scoring.py
 ## 3. Validate the whole pipeline
 
 ```bash
-coral validate .       # checks task.yaml, then runs the grader on seed/noop.c
+coral validate .       # checks task.yaml, then runs the grader on seed/noop.c (the S3-FIFO seed)
 ```
 This does one real eval (about 1 minute). The score you see is the absolute throughput in
-ops/s; the unmodified `noop` seed should land around 1210-1225 (repeat runs vary by 1-2%). There
+ops/s; the unmodified S3-FIFO seed has no recorded baseline yet (repeat runs vary by 1-2%). There
 is no calibration step: the grader returns the measured throughput directly.
 
 ## 4. Run the agent
@@ -70,7 +70,7 @@ is no calibration step: the grader returns the measured throughput directly.
 ```bash
 source ./litellm-creds.sh
 export PATH="$HOME/.local/bin:$PATH"
-coral start -c task.yaml run.stop.max_real_attempts=5     # bounded; drop the override for an open-ended run
+coral start -c task.yaml run.stop.max_real_attempts=20    # bounded; drop the override for an open-ended run
 ```
 This starts CORAL's gateway on `:4001`, creates a git worktree of `seed/` and launches
 one Claude Code agent as a child process of the manager (`run.session: local`; CORAL's

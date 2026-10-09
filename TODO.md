@@ -2,6 +2,12 @@
 
 ## Status (2026-10-09)
 
+**Branch `20-evol-one-seed`:** single-seed experiment. `seed/noop.c` holds S3-FIFO (filename kept
+so `policy_file` is unchanged) and is the only starting policy; the other reference policies were
+removed from `seed/reference/` (headers only remain), and `task.yaml` no longer mentions them.
+Planned run: `max_real_attempts=20`. S3-FIFO's baseline score is not measured yet. The notes
+below about seven reference seeds describe `absolute-throughput-score`, not this branch.
+
 **Branch `absolute-throughput-score`:** the grader's score is the ABSOLUTE measured throughput
 in ops/s (no baseline calibration, z-score, `tanh` or weighting); the agent maximizes it. The
 other probes appear in the feedback only for diagnosis. The calibration step, stats cache,
@@ -77,9 +83,7 @@ benchmark run on the node; `grader/tests` checks their format. Also learned: Clo
 
 ## Deferred
 
-- **Real seed set.** `seed/noop.c` is the dry-run seed. Other starting policies need
-  the `vulcan_bpf` headers (nested submodule, already staged at compile time) and
-  would be added under `seed/`.
+- **Other seeds.** Deliberately removed on this branch (S3-FIFO only).
 - **`agents.count` > 1**, islands.
 - **Multiple nodes:** one CORAL instance per node. A multi-node grader (a list of
   `ssh_target`s) is not implemented.
