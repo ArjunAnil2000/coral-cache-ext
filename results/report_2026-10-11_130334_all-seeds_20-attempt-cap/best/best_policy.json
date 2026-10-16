@@ -1,0 +1,8 @@
+{
+ "run": "2026-10-11_130334",
+ "commit_hash": "3233ed4a7506f3b792ae5f259490dc66118db99a",
+ "score": 1262.31,
+ "budget_class": "real",
+ "title": "baseline: reference mglru.c unchanged (family comparison vs s3fifo ~1217)",
+ "selection": "highest score among scored attempts (tune attempts included)"
+}

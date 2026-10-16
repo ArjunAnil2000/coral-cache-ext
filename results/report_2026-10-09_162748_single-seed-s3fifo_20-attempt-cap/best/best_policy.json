@@ -1,0 +1,8 @@
+{
+ "run": "2026-10-09_162748",
+ "commit_hash": "260db443b4564b5c547829bf1e2097edeafbffb5",
+ "score": 1276.89,
+ "budget_class": "tune",
+ "title": "INSTRUMENTATION v6: why eviction requests go unfilled (got~req/2): count iterate outcomes (scan/small notready, evict, promote) + short calls. trunc theory refuted (trunc=2).",
+ "selection": "highest score among scored attempts (tune attempts included)"
+}

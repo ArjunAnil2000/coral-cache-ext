@@ -1,0 +1,8 @@
+{
+ "run": "2026-10-09_004013",
+ "commit_hash": "50f29a63bbb7fd75e1d353992a90a106851a6052",
+ "score": 0.9982990245218026,
+ "budget_class": "tune",
+ "title": "repeat #2 of freq-cap-2 gated-ghost s3fifo (e573de75: 1259.7 ops/s, 308.4 MB) to compare mean vs b631bf1b (3 runs: mean 1268 ops/s, 309.0 MB)",
+ "selection": "highest score among scored attempts (tune attempts included)"
+}

@@ -1,0 +1,8 @@
+{
+ "run": "2026-10-09_102552",
+ "commit_hash": "b171f393ceafdec2717e21179d65eb849cc3144a",
+ "score": 1258.7,
+ "budget_class": "real",
+ "title": "Sensitivity probe: reference mru.c (should be bad for skewed GETs). get_scan=1225, s3fifo=1222, noop~1215 all identical; testing whether eviction policy moves throughput at all. (notes dir not writable from this agent: permission denied)",
+ "selection": "highest score among scored attempts (tune attempts included)"
+}
