@@ -58,7 +58,7 @@ def banner(src):
     return " ".join(out)
 
 
-noop_desc = banner(subprocess.run(["git", "show", "absolute-throughput-score:seed/noop.c"], cwd=REPO, capture_output=True, text=True).stdout)
+noop_desc = banner(open(f"{REPO}/seed/noop.c").read())
 
 data = collections.OrderedDict()
 for name, r in RUNS.items():
@@ -232,6 +232,41 @@ def footer(canvas, doc):
 
 
 # ------------------------------------------------------------------ build
+def probes(nm, a):
+    """Probe values of one attempt, parsed from its recorded grader feedback (formats differ between the tanh run and the abs runs)."""
+    fb = json.load(open(f"{RES}/cache-ext-get-scan/{RUNS[nm]['dir']}/.coral/public/attempts/{a['hash']}.json"))["feedback"]
+    P = dict(tput=a["tput"], rbytes=None, wbytes=None, rios=None, refault=None, pgmajfault=None, pgactivate=None, resident=None, wall=None)
+    m = re.search(r"rbytes=([\d.]+)MiB wbytes=([\d.]+)MiB rios=(\d+)", fb)
+    if m:
+        P.update(rbytes=float(m.group(1)), wbytes=float(m.group(2)), rios=int(m.group(3)))
+    m = re.search(r"refault_file=(\d+) pgmajfault=(\d+) pgactivate=(\d+) resident_file=(\d+)MiB", fb)
+    if m:
+        P.update(refault=int(m.group(1)), pgmajfault=int(m.group(2)), pgactivate=int(m.group(3)), resident=int(m.group(4)))
+    m = re.search(r"cgroup_iostat: ([\d.e+]+) bytes", fb)            # tanh-run format: bytes read only
+    if m:
+        P["rbytes"] = float(m.group(1)) / 1048576.0
+    m = re.search(r"cgroup_memstat: (\d+) refaults", fb)
+    if m:
+        P["refault"] = int(m.group(1))
+    m = re.search(r"wall=([\d.]+)s", fb)
+    if m:
+        P["wall"] = float(m.group(1))
+    ops = a["tput"] * 30.0                                            # 30 s measured phase
+    P["kb_op"] = P["rbytes"] * 1024.0 / ops if P["rbytes"] is not None else None
+    P["rf_kops"] = P["refault"] / ops * 1e3 if P["refault"] is not None else None
+    P["io_kops"] = P["rios"] / ops * 1e3 if P["rios"] is not None else None
+    P["mbs"] = P["rbytes"] / 30.0 if P["rbytes"] is not None else None
+    return P
+
+
+def mean_probes(Ps):
+    out = {}
+    for k in Ps[0]:
+        v = [p[k] for p in Ps if p[k] is not None]
+        out[k] = float(np.mean(v)) if v else None
+    return out
+
+
 def code_listing(src, ref_lines):
     lines = src.splitlines()
     sm = difflib.SequenceMatcher(a=ref_lines, b=lines, autojunk=False)
@@ -349,6 +384,51 @@ def main():
         story.append(Paragraph(f"<b>What it is:</b> {html.escape(top_ev['title'])}. Its {len(src.splitlines())}-line source differs from the S3-FIFO reference (<font name='DVM'>seed/reference/s3fifo.c</font>) in {nchg} lines (highlighted below). It is the highest-throughput real attempt in this run that is not an unmodified seed ({sg(100*(top_ev['tput']/s3_mean-1),2)}% vs the unmodified S3-FIFO mean).", BODY))
         story.append(Paragraph("Source file: <font name='DVM'>best/best_policy.c</font> in the run's report folder holds this run's own-score best; this attempt's file is <font name='DVM'>noop.c</font> at that commit in the run's agent worktree.", NOTE))
         story += code_listing(src, ref_lines)
+
+    # ---- final: best evolved vs the seed it evolved from
+    story += [NextPageTemplate("main"), PageBreak(), Paragraph("Final comparison: best evolved policy vs the seed it was evolved from", H1)]
+    best_ev_by_run = {s_[0]: s_[3] for s_ in sel}
+    story.append(Paragraph("For each run, the best evolved policy (highest measured throughput among real, non-seed attempts) next to the unmodified seed it descends from, measured in the same run. The seed row is the mean of that run's unmodified measurements (n shown); the evolved row is a single measurement. Δ% = evolved relative to that run's seed row (negative bytes/refaults/I/O = less read traffic). \"n/r\" = not recorded: the tanh run's grader only reported bytes read and refaults. Operations in the phase = throughput × 30 s.", BODY))
+    cols = ["Run", "Policy", "Att.", "Tput ops/s", "Δ%", "Read MiB", "Δ%", "Written MiB", "Read I/Os", "Refaults", "Δ%", "pg-major-flt", "pg-activate", "Resid. MiB",
+            "Read KB/op", "Refault /1k op", "I/Os /1k op", "Read MB/s", "Wall s"]
+    rows = [cols]
+    hl = []
+
+    def fmt(v, n=1):
+        return "n/r" if v is None else f(v, n)
+
+    def dlt(v, base, n=1):
+        return "-" if v is None or base is None or base == 0 else sg(100 * (v / base - 1), n) + "%"
+
+    def prow(label, pol, att, P, B, bold=False):
+        return [label, pol, att, fmt(P["tput"], 2), dlt(P["tput"], B["tput"]) if B is not P else "-", fmt(P["rbytes"], 1), dlt(P["rbytes"], B["rbytes"]) if B is not P else "-", fmt(P["wbytes"], 1), fmt(P["rios"], 0),
+                fmt(P["refault"], 0), dlt(P["refault"], B["refault"]) if B is not P else "-", fmt(P["pgmajfault"], 0), fmt(P["pgactivate"], 0), fmt(P["resident"], 0), fmt(P["kb_op"], 2), fmt(P["rf_kops"], 1), fmt(P["io_kops"], 1), fmt(P["mbs"], 2), fmt(P["wall"], 1)]
+    for nm, v in data.items():
+        seeds_here = [a for a in v["A"] if a["ref"] == "s3fifo"]
+        SP = [probes(nm, a) for a in seeds_here]
+        SB = mean_probes(SP)
+        ev = best_ev_by_run[nm]
+        EP = probes(nm, ev)
+        rows.append(prow(nm, f"S3-FIFO seed (unmodified), mean of n={len(SP)}", ", ".join(f"#{a['n']}" for a in seeds_here), SB, SB))
+        rows.append(prow(nm, f"best evolved: {ev['short']}", f"#{ev['n']}", EP, SB))
+        hl.append(len(rows) - 1) if ev is overall else None
+    story.append(tbl(rows, [0.95, 1.35, 0.45, 0.55, 0.45, 0.5, 0.45, 0.45, 0.45, 0.5, 0.45, 0.45, 0.5, 0.45, 0.4, 0.45, 0.45, 0.4, 0.4], fs=5.6, align=["L", "L", "L"] + ["R"] * 16, highlight=hl))
+    story.append(Paragraph("Shaded: the overall best policy. Bytes written are 0.0 in every run that recorded them (the benchmark is read-only); pgmajfault, pgactivate and resident file size were not recorded by the tanh run.", NOTE))
+
+    # which seed is each best evolved policy closest to?
+    story.append(Paragraph("Which seed each policy descends from", H2))
+    rows = [["Run", "Best evolved policy", "Lines differing from each reference seed (fewer = closer)", "Closest seed"]]
+    for nm, v in data.items():
+        ev = best_ev_by_run[nm]
+        src = subprocess.run(["git", "show", f"{ev['hash']}:noop.c"], cwd=v["ag"], capture_output=True, text=True, check=True).stdout.splitlines()
+        dif = {}
+        for n_, rs in ref_src.items():
+            sm_ = difflib.SequenceMatcher(a=rs.splitlines(), b=src, autojunk=False)
+            dif[n_] = sum(j2 - j1 for tag, i1, i2, j1, j2 in sm_.get_opcodes() if tag != "equal")
+        near = min(dif, key=dif.get)
+        rows.append([nm, f"#{ev['n']} {ev['short']} ({len(src)} lines)", ", ".join(f"{k}: {dif[k]}" for k in SEEDS), f"{near}.c"])
+    story.append(tbl(rows, [1.3, 1.9, 5.5, 1.0], fs=6.4, align=["L", "L", "L", "L"]))
+    story.append(Paragraph("Computed by diffing each policy's source against the seven reference files (counting lines that appear in the evolved file but not in the reference). In all three runs the best evolved policy is far closer to S3-FIFO than to any other seed, which is why it is used as the comparison seed above.", NOTE))
     return story
 
 
