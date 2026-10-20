@@ -1,6 +1,6 @@
 # coral-cache-evolution
 
-> **Branch `20-evol-one-seed`:** single-seed experiment. S3-FIFO is the only starting policy
+> **Branch `one-host-one-seed-score-maximize-throughput`:** single-seed experiment, score = absolute throughput (ops/s). S3-FIFO is the only starting policy
 > (`seed/noop.c`); no other example policies are provided; 20-attempt bounded run.
 
 A [CORAL](https://github.com/Human-Agent-Society/CORAL) task for evolving Linux

@@ -2,13 +2,13 @@
 
 ## Status (2026-10-09)
 
-**Branch `20-evol-one-seed`:** single-seed experiment. `seed/noop.c` holds S3-FIFO (filename kept
+**Branch `one-host-one-seed-score-maximize-throughput`:** single-seed experiment, score = absolute throughput. `seed/noop.c` holds S3-FIFO (filename kept
 so `policy_file` is unchanged) and is the only starting policy; the other reference policies were
 removed from `seed/reference/` (headers only remain), and `task.yaml` no longer mentions them.
 Planned run: `max_real_attempts=20`. S3-FIFO's baseline score is not measured yet. The notes
-below about seven reference seeds describe `absolute-throughput-score`, not this branch.
+below about seven reference seeds describe `one-host-all-seeds-score-maximize-throughput`, not this branch.
 
-**Branch `absolute-throughput-score`:** the grader's score is the ABSOLUTE measured throughput
+**Scoring on this branch:** the grader's score is the ABSOLUTE measured throughput
 in ops/s (no baseline calibration, z-score, `tanh` or weighting); the agent maximizes it. The
 other probes appear in the feedback only for diagnosis. The calibration step, stats cache,
 `normalization.py` and the calibrate CLI were removed on this branch.
