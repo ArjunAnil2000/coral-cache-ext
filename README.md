@@ -1,5 +1,9 @@
 # coral-cache-evolution
 
+> **Branch `one-host-one-seed-score-tanh`:** single-seed experiment with the baseline-normalized
+> score (z-score vs the no-op baseline, tanh-squashed, weighted). S3-FIFO is the only starting
+> policy (`seed/noop.c`); no other example policies are provided.
+
 A [CORAL](https://github.com/Human-Agent-Society/CORAL) task for evolving Linux
 page-cache eviction policies, written as eBPF `cache_ext` struct_ops programs,
 against a GET-SCAN LevelDB workload. An autonomous Claude Code agent edits one
@@ -19,7 +23,7 @@ grader ssh-es to a **CloudLab node** that has the booted `6.6.8-cache-ext`
 kernel, `clang-14`, `bpftool` and the benchmark stack:
 
 ```
-dev host:  coral start -> agent edits noop.c -> grader (scoring, calibration stats)
+dev host:  coral start -> agent edits noop.c (S3-FIFO seed) -> grader (scoring, calibration stats)
                                                    |  ssh (forced-command key)
 node:      node/eval_remote.py: flock -> compile_policy -> attach struct_ops
                                 -> get_scan benchmark -> raw probe values (JSON)
@@ -53,9 +57,10 @@ all evals of a request. CORAL itself grades serially by default
 │                                statement), grader args, 1 claude_code agent, gateway :4001
 ├── litellm_config.yaml          Bedrock model routing for CORAL's LiteLLM gateway
 ├── seed/
-│   ├── noop.c                   starting policy (no-op = the score baseline); the ONLY graded file
-│   └── reference/               7 combined example policies (fifo, mru, s3fifo, sampling, get_scan,
-│                                mglru, lhd; same one-file format as noop.c) + cache_ext API headers
+│   ├── noop.c                   the single seed: S3-FIFO (filename kept for the grader's policy_file);
+│   │                            the ONLY graded file. The score baseline is the grader's own
+│   │                            baseline_noop.c, not this file
+│   └── reference/               cache_ext API headers only (no example policies)
 ├── grader/                      CORAL grader package (runs on the dev host)
 │   ├── src/cache_evolution_grader/
 │   │   ├── grader.py            calibration + remote call + scoring

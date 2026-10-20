@@ -59,10 +59,10 @@ python3 -I grader/tests/test_scoring.py
 ## 3. Validate the whole pipeline
 
 ```bash
-coral validate .       # checks task.yaml, then runs the grader on seed/noop.c
+coral validate .       # checks task.yaml, then runs the grader on seed/noop.c (the S3-FIFO seed)
 ```
 The first grade calibrates the `noop` baseline (8 evals, ~6 min) and caches stats at
-`~/.cache/cache_evolution_grader/get_scan_noop_stats.json`; the seed should then score ~0.
+`~/.cache/cache_evolution_grader/get_scan_noop_stats.json`; the unchanged S3-FIFO seed scores whatever it scores relative to that no-op baseline (not 0).
 To calibrate ahead of time (needs the grader's deps, e.g. the `coral` tool venv):
 ```bash
 PYTHONPATH=grader/src ~/.local/share/uv/tools/coral/bin/python -m cache_evolution_grader.calibrate \
@@ -74,7 +74,7 @@ PYTHONPATH=grader/src ~/.local/share/uv/tools/coral/bin/python -m cache_evolutio
 ```bash
 source ./litellm-creds.sh
 export PATH="$HOME/.local/bin:$PATH"
-coral start -c task.yaml run.stop.max_real_attempts=5     # bounded; drop the override for an open-ended run
+coral start -c task.yaml run.stop.max_real_attempts=20    # bounded; drop the override for an open-ended run
 ```
 This starts CORAL's gateway on `:4001`, creates a git worktree of `seed/` and launches
 one Claude Code agent as a child process of the manager (`run.session: local`; CORAL's

@@ -2,6 +2,13 @@
 
 ## Status (2026-10-08)
 
+**Branch `one-host-one-seed-score-tanh`:** single-seed experiment with tanh/z-score scoring.
+`seed/noop.c` holds S3-FIFO (filename kept so `policy_file` is unchanged) and is the only
+starting policy; the other reference policies were removed from `seed/reference/` (headers
+only remain). The score baseline is still the vanilla-kernel no-op measured by the grader
+(`baseline_noop.c`), so the unchanged S3-FIFO seed will not score 0. The notes below about
+seven reference seeds describe the all-seeds branches, not this one.
+
 All earlier runs, their results and the cached noop calibration were deleted on
 2026-10-08 to start from scratch. Nothing is running. The next run recalibrates the noop
 baseline on its first grade (8 evals, ~6 min) or via the calibrate CLI (see how-to-run.md).
@@ -71,9 +78,7 @@ benchmark run on the node; `grader/tests` checks their format. Also learned: Clo
 
 ## Deferred
 
-- **Real seed set.** `seed/noop.c` is the dry-run seed. Other starting policies need
-  the `vulcan_bpf` headers (nested submodule, already staged at compile time) and
-  would be added under `seed/`.
+- **Other seeds.** Deliberately removed on this branch (S3-FIFO only).
 - **`agents.count` > 1**, islands.
 - **Multiple nodes:** one CORAL instance per node. A multi-node grader (a list of
   `ssh_target`s with per-node calibration stats) is not implemented.
