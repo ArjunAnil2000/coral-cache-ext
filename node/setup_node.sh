@@ -31,6 +31,7 @@ clone_pinned() { # url rev dest
     mkdir -p "$3"
     git clone --quiet "$1" "$3"
     git -C "$3" checkout --quiet "$2"
+    git -C "$3" submodule update --init --recursive --quiet   # e.g. leveldb's third_party/benchmark
 }
 
 phase_kernel() {
