@@ -2,7 +2,7 @@
 
 ## Status (2026-10-09)
 
-**Branch `absolute-throughput-score`:** the grader's score is the ABSOLUTE measured throughput
+**Branch `one-host-all-seeds-score-maximize-throughput`:** all seeds (noop + 7 reference policies); the grader's score is the ABSOLUTE measured throughput
 in ops/s (no baseline calibration, z-score, `tanh` or weighting); the agent maximizes it. The
 other probes appear in the feedback only for diagnosis. The calibration step, stats cache,
 `normalization.py` and the calibrate CLI were removed on this branch.

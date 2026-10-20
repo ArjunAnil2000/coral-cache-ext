@@ -1,5 +1,8 @@
 # coral-cache-evolution
 
+> **Branch `one-host-all-seeds-score-maximize-throughput`:** all seeds available (no-op start plus
+> 7 reference policies); score = absolute measured throughput (ops/s), no normalization.
+
 A [CORAL](https://github.com/Human-Agent-Society/CORAL) task for evolving Linux
 page-cache eviction policies, written as eBPF `cache_ext` struct_ops programs,
 against a GET-SCAN LevelDB workload. An autonomous Claude Code agent edits one

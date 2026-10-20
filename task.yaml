@@ -38,7 +38,7 @@ task:
     `evo_policy_folio_accessed`, plus the `evo_policy_ops` struct) and
     `SECTION: USERSPACE LOADER`. Keep both sections and the marker comments:
     the grader splits the file on them. The starting policy is a no-op that
-    leaves eviction to the kernel's default reclaim (the score baseline).
+    leaves eviction to the kernel's default reclaim (the reference starting point).
     Complete example policies are in `reference/` inside your worktree, one file each, in
     exactly the same format as `noop.c`: fifo.c, mru.c, s3fifo.c, sampling.c, get_scan.c,
     mglru.c, lhd.c. Each starts with a short description of what the policy does, and each
