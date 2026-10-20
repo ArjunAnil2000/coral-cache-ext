@@ -1,5 +1,8 @@
 # coral-cache-evolution
 
+> **Branch `one-host-all-seeds-score-tanh`:** all seeds available (no-op start plus 7 reference
+> policies); score = baseline-normalized (z-score vs the no-op, tanh-squashed, weighted).
+
 A [CORAL](https://github.com/Human-Agent-Society/CORAL) task for evolving Linux
 page-cache eviction policies, written as eBPF `cache_ext` struct_ops programs,
 against a GET-SCAN LevelDB workload. An autonomous Claude Code agent edits one

@@ -2,6 +2,10 @@
 
 ## Status (2026-10-08)
 
+**Branch `one-host-all-seeds-score-tanh`:** all seeds (noop + 7 reference policies) with the
+z-score/`tanh` score vs the no-op baseline. The sibling branches differ only in seed set
+(`one-seed`) and/or scoring (`maximize-throughput`).
+
 All earlier runs, their results and the cached noop calibration were deleted on
 2026-10-08 to start from scratch. Nothing is running. The next run recalibrates the noop
 baseline on its first grade (8 evals, ~6 min) or via the calibrate CLI (see how-to-run.md).
