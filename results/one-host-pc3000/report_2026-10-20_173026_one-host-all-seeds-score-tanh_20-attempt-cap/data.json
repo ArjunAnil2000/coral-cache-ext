@@ -1,0 +1,1519 @@
+{
+ "run": "2026-10-20_173026",
+ "branch": "one-host-all-seeds-score-tanh",
+ "host": "pc306",
+ "mode": "tanh",
+ "seeds": "all",
+ "auto_stop": {
+  "agent_id": "captain-nemo",
+  "attempt_id": "926bb08d05b95bda8ab686eff843ef108f5a75e0",
+  "direction": "maximize",
+  "max_real_attempts": 20,
+  "real_attempt_count": 20,
+  "reason": "max_real_attempts",
+  "score": 0.5958535210759192,
+  "score_threshold": null,
+  "timestamp": "2026-10-20T23:27:05.128744+00:00"
+ },
+ "wall_hours": 0.9427616705555556,
+ "gateway_status": {
+  "400": 64,
+  "200": 192
+ },
+ "attempts": [
+  {
+   "hash": "4efc509a6de38f78e09af2e5821a39bb560c55e0",
+   "short": "4efc509a",
+   "parent": "ddcbc85f",
+   "title": "Baseline: reference get_scan.c unchanged (scan-pid list + sampled LFU, index-block bonus) to calibrate where the reference sits vs noop",
+   "status": "improved",
+   "cls": "real",
+   "score": -0.0817520336058808,
+   "submit": "2026-10-20T22:30:58.313831+00:00",
+   "key": "f129c5ff0d",
+   "lines": 603,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.8,
+   "tput": 495.71,
+   "rbytes_mib": 133.7738037109375,
+   "refault": 10876.0,
+   "z": {
+    "cgroup_iostat": -2.58,
+    "cgroup_memstat": -2.33,
+    "throughput": -0.53
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": "get_scan",
+   "n": 1
+  },
+  {
+   "hash": "1dab6b0b6a228d25906721d9e576c767bffced3c",
+   "short": "1dab6b0b",
+   "parent": "4efc509a",
+   "title": "v2: no per-folio hash map. SCAN list (scan_pids adds) FIFO evicted first from head; GEN list LRU (non-scan access -> move tail, also promotes scan folios). Tests whether get_scan's throughput loss is hook CPU/sampling overhead",
+   "status": "improved",
+   "cls": "real",
+   "score": 0.45518835081362174,
+   "submit": "2026-10-20T22:40:46.015834+00:00",
+   "key": "527c6aa043",
+   "lines": 301,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.8,
+   "tput": 587.25,
+   "rbytes_mib": 164.18743133544922,
+   "refault": 17143.0,
+   "z": {
+    "cgroup_iostat": -1.32,
+    "cgroup_memstat": -1.26,
+    "throughput": 0.31
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 2
+  },
+  {
+   "hash": "38e8541f0ef6a2faaac6ffd8a012c2ab047e6d52",
+   "short": "38e8541f",
+   "parent": "1dab6b0b",
+   "title": "v2 repeat (identical BPF; trailing comment only) to measure run-to-run noise of throughput probe",
+   "status": "improved",
+   "cls": "real",
+   "score": 0.5741209877143422,
+   "submit": "2026-10-20T22:42:33.545418+00:00",
+   "key": "527c6aa043",
+   "lines": 302,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 608.06,
+   "rbytes_mib": 163.61331939697266,
+   "refault": 17097.0,
+   "z": {
+    "cgroup_iostat": -1.35,
+    "cgroup_memstat": -1.27,
+    "throughput": 0.5
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 3
+  },
+  {
+   "hash": "346b8d9ca033ab46296571b4b16b4367784646f3",
+   "short": "346b8d9c",
+   "parent": "38e8541f",
+   "title": "v3: GEN list LRU -> CLOCK with 2-bit freq counter (hash map only for GEN folios; accessed bumps freq, no list move). Scan FIFO unchanged. Tests whether frequency on GET side cuts bytes read without get_scan's throughput loss",
+   "status": "improved",
+   "cls": "real",
+   "score": 0.6434124072056753,
+   "submit": "2026-10-20T22:44:21.772738+00:00",
+   "key": "1249a3d75b",
+   "lines": 346,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.3,
+   "tput": 621.82,
+   "rbytes_mib": 162.94574737548828,
+   "refault": 16960.0,
+   "z": {
+    "cgroup_iostat": -1.37,
+    "cgroup_memstat": -1.29,
+    "throughput": 0.63
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 4
+  },
+  {
+   "hash": "3c3bcc9854dd1d3e969361b71562e9229bc94cb2",
+   "short": "3c3bcc98",
+   "parent": "346b8d9c",
+   "title": "v4: v3 + protect LevelDB SST tail pages (last 8 pages = index/filter/footer): never evicted from GEN; scan-loaded tail pages moved SCAN->GEN with full credit instead of evicted. Targets get_scan's lower bytes read (1.40e8 vs our 1.71e8)",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.6099709102807299,
+   "submit": "2026-10-20T22:46:15.773827+00:00",
+   "key": "36664ca299",
+   "lines": 376,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.6,
+   "tput": 614.39,
+   "rbytes_mib": 162.23812103271484,
+   "refault": 16761.0,
+   "z": {
+    "cgroup_iostat": -1.4,
+    "cgroup_memstat": -1.32,
+    "throughput": 0.56
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 5
+  },
+  {
+   "hash": "babe05635fc71bdcd66f79dc8396f2965a1fb67c",
+   "short": "babe0563",
+   "parent": "3c3bcc98",
+   "title": "v5: v4 but GEN eviction = sampled LFU (10 samples, uncapped lifetime access counts) instead of CLOCK; scan FIFO + tail protection unchanged. Isolates whether get_scan's frequency memory explains its lower bytes read (1.40e8)",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.3904706843954606,
+   "submit": "2026-10-20T22:48:06.893558+00:00",
+   "key": "2597d0ae0e",
+   "lines": 365,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.4,
+   "tput": 574.71,
+   "rbytes_mib": 158.1878662109375,
+   "refault": 15886.0,
+   "z": {
+    "cgroup_iostat": -1.57,
+    "cgroup_memstat": -1.47,
+    "throughput": 0.2
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 6
+  },
+  {
+   "hash": "eea35cdf848ad1d8c5fd565068bf3505885943c5",
+   "short": "eea35cdf",
+   "parent": "346b8d9c",
+   "title": "v6: GET side S3-FIFO: new GET folios -> PROB list (evicted unless re-accessed, re-accessed -> MAIN via continue_list), MAIN = 2-bit CLOCK; PROB kept ~10% of GET pages. Scan FIFO evicted first unchanged; tail protection dropped. Goal: one-hit GET/readahead pages leave quickly so hot set fits better",
+   "status": "crashed",
+   "cls": "real",
+   "score": null,
+   "submit": "2026-10-20T22:50:35.910416+00:00",
+   "key": "ca7b855cbe",
+   "lines": 409,
+   "crashed": true,
+   "fail": "eval: compile failed: compile failed",
+   "wall": null,
+   "tput": null,
+   "rbytes_mib": null,
+   "refault": null,
+   "z": {},
+   "base": {},
+   "ref": null,
+   "n": 7
+  },
+  {
+   "hash": "857cc0496a012258d2f1b659df813478134c1198",
+   "short": "857cc049",
+   "parent": "eea35cdf",
+   "title": "v6 retry: same S3-FIFO GET side (PROB->MAIN CLOCK, PROB ~10%), scan FIFO first; fix: globals typed __s64 so skeleton header compiles",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.5332334985153342,
+   "submit": "2026-10-20T22:51:16.701478+00:00",
+   "key": "66e0172979",
+   "lines": 409,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.5,
+   "tput": 599.11,
+   "rbytes_mib": 160.58635711669922,
+   "refault": 16375.0,
+   "z": {
+    "cgroup_iostat": -1.47,
+    "cgroup_memstat": -1.39,
+    "throughput": 0.42
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 8
+  },
+  {
+   "hash": "911a0b45fdd6bf83589bd4deee9c68a9fcdda0e0",
+   "short": "911a0b45",
+   "parent": "346b8d9c",
+   "title": "DIAGNOSTIC inverse of v3: evict GEN (CLOCK) first, SCAN FIFO only as fallback. Tests hypothesis that ops/s is dominated by scan-thread speed (bytes read and ops/s positively correlated across evals 1-8)",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.477438779142529,
+   "submit": "2026-10-20T22:52:44.268784+00:00",
+   "key": "a1f134d0c1",
+   "lines": 347,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.5,
+   "tput": 612.86,
+   "rbytes_mib": 184.94129180908203,
+   "refault": 22056.0,
+   "z": {
+    "cgroup_iostat": -0.47,
+    "cgroup_memstat": -0.42,
+    "throughput": 0.55
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 9
+  },
+  {
+   "hash": "ad9c3e30a1a40ec75047d5386fa02e5a2c87c32d",
+   "short": "ad9c3e30",
+   "parent": "346b8d9c",
+   "title": "structural attempt 1/3 on hook-cost minimisation: no folio_accessed hook, no maps; SCAN FIFO first then GEN FIFO. If ops/s holds ~620 while bytes rise, throughput is overhead-bound not miss-bound",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.49524308358051344,
+   "submit": "2026-10-20T22:54:38.716219+00:00",
+   "key": "16448db719",
+   "lines": 289,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 597.25,
+   "rbytes_mib": 169.65579986572266,
+   "refault": 18367.0,
+   "z": {
+    "cgroup_iostat": -1.1,
+    "cgroup_memstat": -1.05,
+    "throughput": 0.4
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 10
+  },
+  {
+   "hash": "190bd06acedcadb72c2bd2373dd0882766caf71d",
+   "short": "190bd06a",
+   "parent": "346b8d9c",
+   "title": "structural attempt 2/3 on hook-cost: v3 with cheaper accessed path (gen_freq lookup first; GEN hits skip relevance+pid checks; scan pid check before relevance walk). Same policy semantics as v3",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.5352465774780552,
+   "submit": "2026-10-20T22:56:48.471635+00:00",
+   "key": "b1a779f51e",
+   "lines": 347,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 599.77,
+   "rbytes_mib": 161.35120391845703,
+   "refault": 16533.0,
+   "z": {
+    "cgroup_iostat": -1.44,
+    "cgroup_memstat": -1.36,
+    "throughput": 0.43
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 11
+  },
+  {
+   "hash": "b5bdef3589ab002390fde6a1dd1323e8b7c1376a",
+   "short": "b5bdef35",
+   "parent": "346b8d9c",
+   "title": "new lane structural attempt 1/3 (scan read-ahead reserve): v3 + scan_count; SCAN FIFO evicted first only while scan list > 2048 pages (8MB), else GEN CLOCK, scan as last fallback. Hypothesis: scan-first evicts not-yet-consumed readahead, slowing the scan thread",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.5669390880716313,
+   "submit": "2026-10-20T22:58:42.475386+00:00",
+   "key": "b2356f8cd4",
+   "lines": 359,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 607.27,
+   "rbytes_mib": 164.58606719970703,
+   "refault": 17379.0,
+   "z": {
+    "cgroup_iostat": -1.31,
+    "cgroup_memstat": -1.22,
+    "throughput": 0.5
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 12
+  },
+  {
+   "hash": "681a738cd86fdc3ae99aac1a7cbc6bf4058bdc45",
+   "short": "681a738c",
+   "parent": "346b8d9c",
+   "title": "structural attempt 1/3 on GET ghost admission: v3 + LRU_HASH ghost (128K entries, key ino<<32^index) filled on GEN eviction; GET re-fault of a ghost page admitted with FREQ_MAX credit. Aim: hot GET pages evicted by CLOCK come back protected",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.5953400950177502,
+   "submit": "2026-10-20T23:00:38.287003+00:00",
+   "key": "b7b68f9750",
+   "lines": 370,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 610.78,
+   "rbytes_mib": 160.78472137451172,
+   "refault": 16414.0,
+   "z": {
+    "cgroup_iostat": -1.46,
+    "cgroup_memstat": -1.38,
+    "throughput": 0.53
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 13
+  },
+  {
+   "hash": "eeed67e94e7b1dda6f2f51b0681c6eb5e2552005",
+   "short": "eeed67e9",
+   "parent": "681a738c",
+   "title": "structural attempt 2/3 on GET ghost admission: ghost 128K->512K entries; scan folios first touched by a GET also get FREQ_MAX credit if in ghost (GET working set re-read by the scan thread)",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.5264116632008806,
+   "submit": "2026-10-20T23:02:05.386494+00:00",
+   "key": "9fb38e80ed",
+   "lines": 377,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.6,
+   "tput": 598.33,
+   "rbytes_mib": 161.5467071533203,
+   "refault": 16659.0,
+   "z": {
+    "cgroup_iostat": -1.43,
+    "cgroup_memstat": -1.34,
+    "throughput": 0.41
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 14
+  },
+  {
+   "hash": "36f9d26bfbdacc18b42304a30bf752d141273f29",
+   "short": "36f9d26b",
+   "parent": "ad9c3e30",
+   "title": "structural attempt 1/3 on kernel-hybrid: track only scan_pids folios (FIFO, evicted first); GET folios not tracked so kernel default reclaim (active/inactive + refault detection) handles them when scan list can't satisfy request. Untried idea",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.46254149929013705,
+   "submit": "2026-10-20T23:04:50.908488+00:00",
+   "key": "87f895528b",
+   "lines": 285,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.3,
+   "tput": 590.32,
+   "rbytes_mib": 167.55104064941406,
+   "refault": 17970.0,
+   "z": {
+    "cgroup_iostat": -1.18,
+    "cgroup_memstat": -1.12,
+    "throughput": 0.34
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 15
+  },
+  {
+   "hash": "715ff107d90ac5fa68513b21f6e3b5ad18f67d93",
+   "short": "715ff107",
+   "parent": "681a738c",
+   "title": "tune probe: v3 + ghost128K unchanged, to learn what --tune does on this grader",
+   "status": "regressed",
+   "cls": "tune",
+   "score": 0.5180341838361495,
+   "submit": "2026-10-20T23:06:50.262158+00:00",
+   "key": "b7b68f9750",
+   "lines": 371,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.4,
+   "tput": 596.87,
+   "rbytes_mib": 161.66019439697266,
+   "refault": 16640.0,
+   "z": {
+    "cgroup_iostat": -1.43,
+    "cgroup_memstat": -1.34,
+    "throughput": 0.4
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 16
+  },
+  {
+   "hash": "ab63a4dcba80aa3988fd236d3fa52936838ce4e6",
+   "short": "ab63a4dc",
+   "parent": "346b8d9c",
+   "title": "tune sweep: v3 with FREQ_MAX 3->7 (stronger frequency memory on GET CLOCK)",
+   "status": "regressed",
+   "cls": "tune",
+   "score": 0.5180291356037098,
+   "submit": "2026-10-20T23:08:09.378001+00:00",
+   "key": "d8362ed901",
+   "lines": 346,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.9,
+   "tput": 597.18,
+   "rbytes_mib": 162.27340698242188,
+   "refault": 16849.0,
+   "z": {
+    "cgroup_iostat": -1.4,
+    "cgroup_memstat": -1.31,
+    "throughput": 0.4
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 17
+  },
+  {
+   "hash": "894a19fb8ae73ae4188927b331be7df2931e8abf",
+   "short": "894a19fb",
+   "parent": "346b8d9c",
+   "title": "instrumentation probe: v3 + bss counters (evict calls, requested, scan/total evicted, adds, promotions) written by loader to ./policy_metrics.json each second; testing whether the policy_counters probe picks this up",
+   "status": "regressed",
+   "cls": "tune",
+   "score": 0.5304074189848621,
+   "submit": "2026-10-20T23:10:26.900682+00:00",
+   "key": "f0fb095ea0",
+   "lines": 376,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 598.27,
+   "rbytes_mib": 159.54303741455078,
+   "refault": 16236.0,
+   "z": {
+    "cgroup_iostat": -1.52,
+    "cgroup_memstat": -1.41,
+    "throughput": 0.41
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 18
+  },
+  {
+   "hash": "52a33298e9daddd98ec0071edeeeb40168e10809",
+   "short": "52a33298",
+   "parent": "894a19fb",
+   "title": "instrumentation probe 2: write policy_metrics.json to env-var paths (POLICY_METRICS*/METRICS*/RESULTS_DIR/OUTPUT_DIR), cwd, /tmp, and watch_dir/.. to find where policy_counters probe looks",
+   "status": "regressed",
+   "cls": "tune",
+   "score": 0.3804150180769545,
+   "submit": "2026-10-20T23:12:05.075906+00:00",
+   "key": "f779016726",
+   "lines": 410,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.4,
+   "tput": 572.27,
+   "rbytes_mib": 154.67548370361328,
+   "refault": 15137.0,
+   "z": {
+    "cgroup_iostat": -1.72,
+    "cgroup_memstat": -1.6,
+    "throughput": 0.18
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 19
+  },
+  {
+   "hash": "8124004a97856ad81d5ee6f993934dc337155e20",
+   "short": "8124004a",
+   "parent": "346b8d9c",
+   "title": "data point: reference mglru.c unchanged (no scan awareness) to place a kernel-style multi-gen LRU vs scan-first CLOCK",
+   "status": "regressed",
+   "cls": "tune",
+   "score": 0.6123932881102154,
+   "submit": "2026-10-20T23:13:44.510466+00:00",
+   "key": "6963d4d403",
+   "lines": 1109,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.8,
+   "tput": 656.95,
+   "rbytes_mib": 189.39495086669922,
+   "refault": 22914.0,
+   "z": {
+    "cgroup_iostat": -0.28,
+    "cgroup_memstat": -0.27,
+    "throughput": 0.95
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": "mglru",
+   "n": 20
+  },
+  {
+   "hash": "3b78f7210068fcc193a480999237756a26276c6b",
+   "short": "3b78f721",
+   "parent": "8124004a",
+   "title": "repeat: reference mglru.c unchanged, confirm 657 ops/s is not noise",
+   "status": "regressed",
+   "cls": "tune",
+   "score": 0.5758381772067053,
+   "submit": "2026-10-20T23:15:13.128198+00:00",
+   "key": "6963d4d403",
+   "lines": 1110,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.4,
+   "tput": 655.85,
+   "rbytes_mib": 192.46482849121094,
+   "refault": 23671.0,
+   "z": {
+    "cgroup_iostat": -0.16,
+    "cgroup_memstat": -0.14,
+    "throughput": 0.94
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": "mglru",
+   "n": 21
+  },
+  {
+   "hash": "7f1f0220d98326c8b9308bb2f4404c5c6aa85747",
+   "short": "7f1f0220",
+   "parent": "3b78f721",
+   "title": "structural attempt 1/3 on scan-aware MGLRU: reference mglru.c (656 ops/s x2, weak I/O) + scan_pids folios inserted into oldest generation (min_seq) so they are reclaimed first; loader reuses harness scan_pids pin. Goal: keep MGLRU throughput, gain scan-first I/O terms",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.6380524466275214,
+   "submit": "2026-10-20T23:16:54.498966+00:00",
+   "key": "8a7cd35ed0",
+   "lines": 1137,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 644.39,
+   "rbytes_mib": 182.0821762084961,
+   "refault": 21300.0,
+   "z": {
+    "cgroup_iostat": -0.59,
+    "cgroup_memstat": -0.55,
+    "throughput": 0.84
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 22
+  },
+  {
+   "hash": "e3195251d7c4893626e1b2869d7d95ecf31fdedf",
+   "short": "e3195251",
+   "parent": "7f1f0220",
+   "title": "structural attempt 2/3 on scan-aware MGLRU: scan folios still in oldest gen but inserted at list TAIL (iterate starts at head) so read-ahead is consumed before eviction; GET folios unchanged (head insert)",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.4732589459008535,
+   "submit": "2026-10-20T23:18:20.398495+00:00",
+   "key": "3d6479b0bf",
+   "lines": 1143,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.5,
+   "tput": 600.52,
+   "rbytes_mib": 177.34718322753906,
+   "refault": 20151.0,
+   "z": {
+    "cgroup_iostat": -0.78,
+    "cgroup_memstat": -0.74,
+    "throughput": 0.43
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 23
+  },
+  {
+   "hash": "8eec8d6feb1a336bd74278311c83affc6d95d6f0",
+   "short": "8eec8d6f",
+   "parent": "e3195251",
+   "title": "structural attempt 3/3 on scan-aware MGLRU: reference MGLRU insertion unchanged; folio_accessed ignores scan-pid accesses so the scan's repeated per-page touches don't promote scan pages into protected tiers",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.5423746731275131,
+   "submit": "2026-10-20T23:19:55.234698+00:00",
+   "key": "5ab0330590",
+   "lines": 1139,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.3,
+   "tput": 657.17,
+   "rbytes_mib": 195.69969177246094,
+   "refault": 24539.0,
+   "z": {
+    "cgroup_iostat": -0.02,
+    "cgroup_memstat": 0.01,
+    "throughput": 0.95
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 24
+  },
+  {
+   "hash": "446132e171516f0b721ce6f360be13d4725f05ac",
+   "short": "446132e1",
+   "parent": "3b78f721",
+   "title": "ablation: reference MGLRU with list_add_tail instead of list_add (FIFO order within generation instead of newest-first). Tests whether head insertion is MGLRU's +8% throughput lever",
+   "status": "regressed",
+   "cls": "tune",
+   "score": 0.5781796981340609,
+   "submit": "2026-10-20T23:21:32.816036+00:00",
+   "key": "38e494ea02",
+   "lines": 1109,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.8,
+   "tput": 637.42,
+   "rbytes_mib": 186.10191345214844,
+   "refault": 22131.0,
+   "z": {
+    "cgroup_iostat": -0.42,
+    "cgroup_memstat": -0.4,
+    "throughput": 0.77
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 25
+  },
+  {
+   "hash": "ce73fb07fcfdb014c78ae16e799e79233203e77b",
+   "short": "ce73fb07",
+   "parent": "7f1f0220",
+   "title": "repeat of scan->oldest MGLRU (7f1f0220, 0.638) to estimate its mean",
+   "status": "improved",
+   "cls": "tune",
+   "score": 0.6777511434089806,
+   "submit": "2026-10-20T23:23:11.356573+00:00",
+   "key": "8a7cd35ed0",
+   "lines": 1138,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.7,
+   "tput": 651.85,
+   "rbytes_mib": 180.4332733154297,
+   "refault": 20779.0,
+   "z": {
+    "cgroup_iostat": -0.65,
+    "cgroup_memstat": -0.64,
+    "throughput": 0.9
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 26
+  },
+  {
+   "hash": "574ed114b077ab081c9bb52634ae15252800aa69",
+   "short": "574ed114",
+   "parent": "ce73fb07",
+   "title": "real submission: scan-aware MGLRU (scan_pids folios -> oldest generation; 2 prior draws 0.638 real / 0.678 tune, mean ~0.66 vs v3 ~0.59)",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.6307453606006086,
+   "submit": "2026-10-20T23:24:22.720940+00:00",
+   "key": "8a7cd35ed0",
+   "lines": 1138,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.8,
+   "tput": 635.1,
+   "rbytes_mib": 178.56216430664062,
+   "refault": 20373.0,
+   "z": {
+    "cgroup_iostat": -0.73,
+    "cgroup_memstat": -0.7,
+    "throughput": 0.75
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 27
+  },
+  {
+   "hash": "926bb08d05b95bda8ab686eff843ef108f5a75e0",
+   "short": "926bb08d",
+   "parent": "574ed114",
+   "title": "scan-aware MGLRU + GET ghost admission: non-scan folio found in MGLRU's ghost map (recently evicted) is admitted to max_seq (youngest gen) instead of min_seq/min_seq+1; scan folios still -> oldest gen",
+   "status": "regressed",
+   "cls": "real",
+   "score": 0.5958535210759192,
+   "submit": "2026-10-20T23:26:05.586472+00:00",
+   "key": "62e60259bc",
+   "lines": 1139,
+   "crashed": false,
+   "fail": null,
+   "wall": 40.8,
+   "tput": 622.01,
+   "rbytes_mib": 174.92961883544922,
+   "refault": 19726.0,
+   "z": {
+    "cgroup_iostat": -0.88,
+    "cgroup_memstat": -0.82,
+    "throughput": 0.63
+   },
+   "base": {
+    "cgroup_iostat": [
+     205792000.0,
+     25410000.0,
+     8
+    ],
+    "cgroup_memstat": [
+     24490.6,
+     5843.0,
+     8
+    ],
+    "throughput": [
+     553.131,
+     109.2,
+     8
+    ]
+   },
+   "ref": null,
+   "n": 28
+  }
+ ],
+ "sessions": [
+  {
+   "cost": 0.3946314,
+   "dur": 469.805,
+   "turns": 8,
+   "inp": 10,
+   "cc": 66395,
+   "cr": 216282,
+   "out": 968,
+   "denials": 0
+  },
+  {
+   "cost": 1.0631184,
+   "dur": 204.769,
+   "turns": 22,
+   "inp": 40,
+   "cc": 30473,
+   "cr": 1485310,
+   "out": 10945,
+   "denials": 3
+  },
+  {
+   "cost": 2.8886318,
+   "dur": 129.758,
+   "turns": 6,
+   "inp": 10,
+   "cc": 10033,
+   "cr": 639038,
+   "out": 5219,
+   "denials": 0
+  },
+  {
+   "cost": 3.0843808,
+   "dur": 109.769,
+   "turns": 4,
+   "inp": 6,
+   "cc": 8000,
+   "cr": 337725,
+   "out": 4409,
+   "denials": 0
+  },
+  {
+   "cost": 3.237153,
+   "dur": 34.53,
+   "turns": 2,
+   "inp": 6,
+   "cc": 7701,
+   "cr": 354316,
+   "out": 2169,
+   "denials": 0
+  },
+  {
+   "cost": 3.3133868,
+   "dur": 79.794,
+   "turns": 3,
+   "inp": 4,
+   "cc": 2012,
+   "cr": 181689,
+   "out": 1491,
+   "denials": 0
+  },
+  {
+   "cost": 3.404536,
+   "dur": 84.798,
+   "turns": 3,
+   "inp": 4,
+   "cc": 3626,
+   "cr": 185516,
+   "out": 1795,
+   "denials": 0
+  },
+  {
+   "cost": 4.1646947999999995,
+   "dur": 164.856,
+   "turns": 9,
+   "inp": 14,
+   "cc": 15324,
+   "cr": 1176994,
+   "out": 5403,
+   "denials": 0
+  },
+  {
+   "cost": 4.413667599999999,
+   "dur": 119.79,
+   "turns": 5,
+   "inp": 8,
+   "cc": 9040,
+   "cr": 626704,
+   "out": 3920,
+   "denials": 0
+  },
+  {
+   "cost": 4.499623199999999,
+   "dur": 74.749,
+   "turns": 3,
+   "inp": 4,
+   "cc": 3660,
+   "cr": 214398,
+   "out": 1238,
+   "denials": 0
+  },
+  {
+   "cost": 4.652203399999999,
+   "dur": 28.276,
+   "turns": 2,
+   "inp": 6,
+   "cc": 4882,
+   "cr": 442831,
+   "out": 1979,
+   "denials": 0
+  },
+  {
+   "cost": 5.0128704,
+   "dur": 109.762,
+   "turns": 8,
+   "inp": 14,
+   "cc": 4923,
+   "cr": 1360380,
+   "out": 3196,
+   "denials": 0
+  },
+  {
+   "cost": 1.2273108000000001,
+   "dur": 104.746,
+   "turns": 5,
+   "inp": 8,
+   "cc": 4990,
+   "cr": 300652,
+   "out": 3954,
+   "denials": 1
+  },
+  {
+   "cost": 5.1228093999999995,
+   "dur": 94.843,
+   "turns": 3,
+   "inp": 4,
+   "cc": 3699,
+   "cr": 231740,
+   "out": 2254,
+   "denials": 0
+  },
+  {
+   "cost": 5.2717978,
+   "dur": 23.508,
+   "turns": 2,
+   "inp": 6,
+   "cc": 4777,
+   "cr": 479497,
+   "out": 1459,
+   "denials": 0
+  },
+  {
+   "cost": 5.3474924,
+   "dur": 74.803,
+   "turns": 3,
+   "inp": 4,
+   "cc": 1893,
+   "cr": 242668,
+   "out": 884,
+   "denials": 0
+  },
+  {
+   "cost": 5.8107502,
+   "dur": 89.813,
+   "turns": 8,
+   "inp": 14,
+   "cc": 16919,
+   "cr": 1532034,
+   "out": 3610,
+   "denials": 0
+  },
+  {
+   "cost": 6.007373,
+   "dur": 99.767,
+   "turns": 4,
+   "inp": 6,
+   "cc": 5709,
+   "cr": 529669,
+   "out": 3106,
+   "denials": 0
+  },
+  {
+   "cost": 6.120051800000001,
+   "dur": 84.769,
+   "turns": 3,
+   "inp": 4,
+   "cc": 3634,
+   "cr": 270264,
+   "out": 2022,
+   "denials": 0
+  },
+  {
+   "cost": 6.2557442000000005,
+   "dur": 94.771,
+   "turns": 3,
+   "inp": 4,
+   "cc": 3592,
+   "cr": 276082,
+   "out": 3125,
+   "denials": 0
+  },
+  {
+   "cost": 6.399365,
+   "dur": 99.801,
+   "turns": 3,
+   "inp": 4,
+   "cc": 6898,
+   "cr": 279674,
+   "out": 2659,
+   "denials": 0
+  },
+  {
+   "cost": 6.5350324,
+   "dur": 94.792,
+   "turns": 3,
+   "inp": 4,
+   "cc": 3682,
+   "cr": 289507,
+   "out": 2967,
+   "denials": 0
+  },
+  {
+   "cost": 6.6375012,
+   "dur": 74.812,
+   "turns": 3,
+   "inp": 4,
+   "cc": 6923,
+   "cr": 293189,
+   "out": 460,
+   "denials": 0
+  },
+  {
+   "cost": 1.3729314000000001,
+   "dur": 109.764,
+   "turns": 4,
+   "inp": 6,
+   "cc": 2967,
+   "cr": 211308,
+   "out": 4425,
+   "denials": 0
+  },
+  {
+   "cost": 6.8425636,
+   "dur": 99.843,
+   "turns": 4,
+   "inp": 6,
+   "cc": 5694,
+   "cr": 605042,
+   "out": 2778,
+   "denials": 0
+  },
+  {
+   "cost": 1.5566434000000002,
+   "dur": 109.787,
+   "turns": 5,
+   "inp": 8,
+   "cc": 5654,
+   "cr": 339550,
+   "out": 4375,
+   "denials": 0
+  },
+  {
+   "cost": 1.7456982000000003,
+   "dur": 114.782,
+   "turns": 5,
+   "inp": 8,
+   "cc": 6761,
+   "cr": 357189,
+   "out": 4189,
+   "denials": 0
+  },
+  {
+   "cost": 2.097867,
+   "dur": 104.797,
+   "turns": 7,
+   "inp": 12,
+   "cc": 12572,
+   "cr": 643004,
+   "out": 8033,
+   "denials": 1
+  },
+  {
+   "cost": 2.1921639999999996,
+   "dur": 74.762,
+   "turns": 4,
+   "inp": 6,
+   "cc": 2651,
+   "cr": 276890,
+   "out": 1282,
+   "denials": 0
+  },
+  {
+   "cost": 2.3200187999999997,
+   "dur": 94.758,
+   "turns": 4,
+   "inp": 6,
+   "cc": 3534,
+   "cr": 283404,
+   "out": 2674,
+   "denials": 0
+  },
+  {
+   "cost": 2.5030612,
+   "dur": 114.79,
+   "turns": 4,
+   "inp": 6,
+   "cc": 6139,
+   "cr": 294917,
+   "out": 4667,
+   "denials": 0
+  }
+ ],
+ "tools": {
+  "Bash": 85,
+  "Read": 3,
+  "Write": 1,
+  "Agent": 1,
+  "SubagentHandback": 1,
+  "WebSearch": 1,
+  "WebFetch": 2
+ },
+ "baseline": {
+  "cgroup_iostat": [
+   205792000.0,
+   25410000.0,
+   8
+  ],
+  "cgroup_memstat": [
+   24490.6,
+   5843.0,
+   8
+  ],
+  "throughput": [
+   553.131,
+   109.2,
+   8
+  ]
+ }
+}

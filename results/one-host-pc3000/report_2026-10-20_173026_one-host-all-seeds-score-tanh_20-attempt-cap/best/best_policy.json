@@ -1,0 +1,42 @@
+{
+ "hash": "346b8d9ca033ab46296571b4b16b4367784646f3",
+ "short": "346b8d9c",
+ "parent": "38e8541f",
+ "title": "v3: GEN list LRU -> CLOCK with 2-bit freq counter (hash map only for GEN folios; accessed bumps freq, no list move). Scan FIFO unchanged. Tests whether frequency on GET side cuts bytes read without get_scan's throughput loss",
+ "status": "improved",
+ "cls": "real",
+ "score": 0.6434124072056753,
+ "submit": "2026-10-20T22:44:21.772738+00:00",
+ "key": "1249a3d75b",
+ "lines": 346,
+ "crashed": false,
+ "fail": null,
+ "wall": 40.3,
+ "tput": 621.82,
+ "rbytes_mib": 162.94574737548828,
+ "refault": 16960.0,
+ "z": {
+  "cgroup_iostat": -1.37,
+  "cgroup_memstat": -1.29,
+  "throughput": 0.63
+ },
+ "base": {
+  "cgroup_iostat": [
+   205792000.0,
+   25410000.0,
+   8
+  ],
+  "cgroup_memstat": [
+   24490.6,
+   5843.0,
+   8
+  ],
+  "throughput": [
+   553.131,
+   109.2,
+   8
+  ]
+ },
+ "ref": null,
+ "n": 4
+}

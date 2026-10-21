@@ -1,0 +1,42 @@
+{
+ "hash": "fefe1ef1ece791fa0601e0875e3587b58631420b",
+ "short": "fefe1ef1",
+ "parent": "76284f7b",
+ "title": "peak test (opposite of eval18): ghost hits go to small queue with freq=1 (one more access promotes) instead of straight to main",
+ "status": "improved",
+ "cls": "real",
+ "score": 0.7553493003863455,
+ "submit": "2026-10-20T23:06:36.934968+00:00",
+ "key": "045a974633",
+ "lines": 604,
+ "crashed": false,
+ "fail": null,
+ "wall": 40.3,
+ "tput": 647.59,
+ "rbytes_mib": 166.36371612548828,
+ "refault": 17599.0,
+ "z": {
+  "cgroup_iostat": -1.01,
+  "cgroup_memstat": -1.01,
+  "throughput": 0.98
+ },
+ "base": {
+  "cgroup_iostat": [
+   196662000.0,
+   21980000.0,
+   8
+  ],
+  "cgroup_memstat": [
+   22642.8,
+   4972.0,
+   8
+  ],
+  "throughput": [
+   549.201,
+   100.9,
+   8
+  ]
+ },
+ "ref": null,
+ "n": 19
+}
