@@ -82,6 +82,30 @@ default would wrap it in tmux, ours does not). The agent edits `noop.c` and subm
 the grader ships it to the node and returns a score plus per-probe feedback. Without
 `max_real_attempts` it runs until you stop it.
 
+## Multi-host evolution (one agent per host)
+
+List your CloudLab nodes in `cloudlab-instances.md` (`ssh user@host`, one per line; every node needs the
+`6.6.8-cache-ext+` kernel, see step 0). Then:
+
+```bash
+scripts/setup_multihost.sh                    # split hosts into buckets, update task.yaml, deploy node/, calibrate
+source ./litellm-creds.sh && coral start -c task.yaml
+```
+`setup_multihost.sh` (options: `--agents N`, `--per-host-attempts 20`, `--no-deploy`, `--no-calibrate`, `--dry-run`):
+1. reads the hosts, checks each is reachable and runs the cache-ext kernel, and splits them round-robin into
+   one bucket per agent (default: as many agents as hosts, so one host each);
+2. writes `hosts.json` (gitignored) and sets `agents.count`, `grader.parallel.max_workers`,
+   `grader.args.hosts_file` / `per_host_budget` and `run.stop.max_real_attempts` (= agents x per-host attempts)
+   in `task.yaml`; those lines are tagged `# multihost-managed`;
+3. runs `node/install_remote.sh` on every host and pre-calibrates the tanh no-op baseline on each (per-host stats files
+   `~/.cache/cache_evolution_grader/get_scan_noop_stats_<host>.json`).
+
+At run time the grader binds each agent to one bucket the first time it submits (stored in
+`.coral/private/host_claims.json`), evaluates only on that bucket's host, scores against that host's own baseline,
+and refuses real evals beyond `per_host_budget` (CORAL files the refusal as a grader error, which does not count toward
+the cap, so the run ends when every host has used its budget). `coral eval --tune` is refused by default (`grader.args.allow_tune: false`; pass `--allow-tune` to the setup script to allow unbudgeted tune evals), so every eval spends the budget and the global cap is reachable. An agent whose budget is spent is told to idle with `sleep` rather than exit, because the run only stops when all agents are done. Hosts evaluate in parallel
+because `grader.parallel.max_workers` equals the agent count. Re-run the script whenever `cloudlab-instances.md` changes.
+
 ## 5. Monitor and collect
 
 ```bash

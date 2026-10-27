@@ -1,0 +1,23 @@
+{
+ "hash": "7e6df4dced7e89a438b49d7bde02cf817c510016",
+ "short": "7e6df4dc",
+ "agent": "captain-ahab",
+ "host": "pc309",
+ "title": "repeat of 0a187508 (region-CLOCK + region-coherent eviction, 711.2) unchanged except comment, to confirm +2.2% over same-host control 695.6",
+ "status": "improved",
+ "cls": "real",
+ "score": 712.23,
+ "submit": "2026-10-21T06:25:58.957654+00:00",
+ "crashed": false,
+ "fail": null,
+ "tput": 712.23,
+ "rbytes_mib": 191.6,
+ "refault": 23486.0,
+ "z": {},
+ "base": {},
+ "wall": 40.7,
+ "key": "f62dd298fd",
+ "lines": 413,
+ "ref": null,
+ "n": 78
+}

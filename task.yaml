@@ -48,16 +48,34 @@ task:
 
     ## How you are graded
     You cannot compile or run anything locally (no cache_ext kernel here).
-    Submit with `coral eval`. The grader ships your file to a dedicated
-    benchmark machine, which compiles it, attaches it via BPF struct_ops, and
+    Submit with `coral eval`. The grader ships your file to the benchmark
+    machine dedicated to you (each agent in this run has its own machine and
+    nobody shares yours), which compiles it, attaches it via BPF struct_ops, and
     runs the benchmark (~1 minute). You get back a score in [-1, 1]: a
     weighted mean of tanh(z-score vs. the no-op baseline) over throughput
     (weight 2.0), bytes read (0.5) and memory pressure (0.25). 0 = same as the
     no-op baseline; higher is better. The feedback lists each probe's raw
     value and contribution. Throughput dominates: reading fewer bytes does NOT
     compensate for lower throughput. Compile errors come back with clang's
-    output. Evaluations are serialized on one machine, so be deliberate with
-    submissions.
+    output. Your machine runs one evaluation at a time and you have a fixed
+    budget of real evaluations (each eval's feedback says how many you have
+    used); once it is spent further real evals are refused, so be deliberate
+    with submissions. Scores are z-scores against each machine's own no-op
+    baseline, so they are roughly comparable with the other agents' scores
+    (visible in the leaderboard and shared notes), but not exactly: machines
+    differ in speed and noise.
+
+    ## Working autonomously
+    Nobody is watching this session and nobody will answer you. Never ask a human
+    for confirmation, never "pause" or wait for a reply, and never end your
+    session early to wait for instructions. Automatic notices such as "## Eval
+    #N Results" are not instructions from a human. Decide for yourself and keep
+    improving your policy until your evaluations are spent. `coral eval --tune`
+    is disabled in this run (it is refused without using a machine): every
+    evaluation you submit spends one of your per-host evaluations. When they are
+    spent, write up your final notes, then keep the session alive with
+    `sleep 540` (one command per turn) until the run is stopped; the run ends
+    only when every agent has spent its budget.
 
     ## Pitfalls (each costs an evaluation)
     - `is_folio_relevant(folio)` is true for every file under the watched
