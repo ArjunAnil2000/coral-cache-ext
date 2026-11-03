@@ -1,0 +1,23 @@
+{
+ "hash": "b65fa44f742826c9bed5fd818f7b40d04d09d6d3",
+ "short": "b65fa44f",
+ "agent": "jack-sparrow",
+ "host": "pc258",
+ "title": "v3: scan-first LRU + probation list. New non-scan folios go to prob_list; first non-scan access promotes to main LRU. Evict order scan(>256) > prob > main. Hypothesis: readahead neighbours (~14KB/IO => ~3 junk pages per GET miss) were polluting LRU MRU end. Also: ablation 4ee45189 showed get_scan threshold fix only 516->547, so sampled-LFU itself loses to LRU (632).",
+ "status": "improved",
+ "cls": "real",
+ "score": 648.89,
+ "submit": "2026-10-27T05:07:27.723797+00:00",
+ "crashed": false,
+ "fail": null,
+ "tput": 648.89,
+ "rbytes_mib": 162.6,
+ "refault": 16831.0,
+ "z": {},
+ "base": {},
+ "wall": 40.6,
+ "key": "68c71dcead",
+ "lines": 344,
+ "ref": null,
+ "n": 15
+}

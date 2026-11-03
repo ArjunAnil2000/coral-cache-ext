@@ -1,0 +1,23 @@
+{
+ "hash": "69132a2103b57e0bfefad06c4dd4e3598f1245bb",
+ "short": "69132a21",
+ "agent": "captain-ahab",
+ "host": "pc252",
+ "title": "MGLRU tier sweep, end point: tier protection DISABLED entirely (TIER_PROTECT 0: oldest-gen folios evicted regardless of refs; only locked/writeback/dirty skipped) = pure generational aging. Reflection on 22bb52af (threshold 3 = 668.65, my best, +4.3% vs same-host noop 641): threshold curve 0->639.0, PID->656.5, 3->668.7 is monotonic (less protection = better on pc252). This tests whether the trend continues to zero protection",
+ "status": "improved",
+ "cls": "real",
+ "score": 686.07,
+ "submit": "2026-10-27T01:30:36.920705+00:00",
+ "crashed": false,
+ "fail": null,
+ "tput": 686.07,
+ "rbytes_mib": 193.0,
+ "refault": 23845.0,
+ "z": {},
+ "base": {},
+ "wall": 41.0,
+ "key": "31dc805448",
+ "lines": 1111,
+ "ref": null,
+ "n": 70
+}
